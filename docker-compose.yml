@@ -1,0 +1,124 @@
+x-logging: &default-logging
+  # json-file без лимита пишет лог контейнера до конца диска, и
+  # `docker system prune` его не видит: файл принадлежит живому контейнеру.
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    # postgres:18.0-alpine + pgBackRest, собирается в CI из docker/postgres/.
+    image: ${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME}-postgres:latest
+    container_name: postgres
+    logging: *default-logging
+    restart: always
+    # Архивация задаётся здесь, а не ALTER SYSTEM: postgresql.auto.conf попал
+    # бы в бэкап, и проверочная копия при восстановлении начала бы писать WAL
+    # в тот же репозиторий. Порядок восстановления — docs/guide/ops/backups.md.
+    command:
+      - postgres
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=pgbackrest --stanza=main archive-push %p
+      - -c
+      - archive_timeout=300s
+    volumes:
+      - postgres_data:/var/lib/postgresql/
+      - postgres_socket:/var/run/postgresql
+    ports:
+      # Только loopback: порт доступен с самого сервера (SSH-туннель для DBeaver),
+      # но не из интернета. Без префикса Docker правит iptables мимо ufw, и база
+      # торчит наружу даже при включённом файрволле.
+      - "127.0.0.1:5432:5432"
+    networks:
+      - app_network
+    env_file:
+      - .env.docker
+
+  backup:
+    # Ночной бэкап и проверка восстановления, docs/guide/ops/backups.md.
+    # pgBackRest ходит в Postgres только через unix-сокет и читает файлы
+    # базы сам, поэтому у сервиса общий с db сокет и volume (на чтение).
+    image: ${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME}-postgres:latest
+    container_name: postgres_backup
+    logging: *default-logging
+    restart: always
+    init: true
+    user: postgres
+    command: ["pg-backup-scheduler"]
+    depends_on:
+      - db
+    environment:
+      PGBACKREST_PG1_USER: ${POSTGRES_USER}
+    volumes:
+      - postgres_data:/var/lib/postgresql/:ro
+      - postgres_socket:/var/run/postgresql
+    env_file:
+      - .env.docker
+
+  migrate:
+    image: ${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME}:latest
+    container_name: fastapi_migrate
+    logging: *default-logging
+    restart: "no"
+    depends_on:
+      - db
+    entrypoint: ["./scripts/migrate.sh"]
+    networks:
+      - app_network
+    env_file:
+      - .env.docker
+
+  web:
+    image: ${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME}:latest
+    container_name: fastapi
+    logging: *default-logging
+    restart: always
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    entrypoint: ["./scripts/start.sh"]
+    expose:
+      - "8000"
+    networks:
+      - app_network
+    env_file:
+      - .env.docker
+
+  caddy:
+    image: serfriz/caddy-ratelimit-dockerproxy-sablier:2.11.1
+    command: caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    container_name: caddy
+    logging: *default-logging
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    env_file:
+      - .env.docker
+    depends_on:
+      - web
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  # tmpfs: при пересоздании контейнеров от прежнего Postgres не остаётся
+  # устаревших файлов сокета и его блокировки.
+  postgres_socket:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+  caddy_data:
+  caddy_config:

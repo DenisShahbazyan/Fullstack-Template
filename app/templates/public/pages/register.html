@@ -1,0 +1,31 @@
+{% extends 'public/base.html' %}
+
+{% block title %}Регистрация — {{ site_name }}{% endblock %}
+
+{% block content %}
+<section class="max-w-md mx-auto px-4 md:px-6 py-10 md:py-16">
+    <h1 class="page-title mb-6">Регистрация</h1>
+    <form method="post" action="/register/submit" class="card p-4 sm:p-6 space-y-4">
+        <input type="hidden" name="token_key" value="{{ csrf_token }}">
+        <div>
+            <label class="label-field" for="first_name">Имя</label>
+            <input class="input-field" type="text" id="first_name" name="first_name"
+                   value="{{ form.first_name if form else '' }}" autocomplete="given-name">
+        </div>
+        <div>
+            <label class="label-field" for="email">Email</label>
+            <input class="input-field" type="email" id="email" name="email"
+                   value="{{ form.email if form else '' }}" required autocomplete="email">
+        </div>
+        <div>
+            <label class="label-field" for="password">Пароль</label>
+            <input class="input-field" type="password" id="password" name="password"
+                   required minlength="8" autocomplete="new-password">
+        </div>
+        <button type="submit" class="btn btn-primary w-full">Зарегистрироваться</button>
+    </form>
+    <p class="text-sm text-ink-muted text-center mt-4">
+        Уже есть аккаунт? <a href="/login" class="link">Войти</a>
+    </p>
+</section>
+{% endblock %}

@@ -1,0 +1,10 @@
+{#- Навигация по страницам из `web.pagination.Pagination`. -#}
+{% macro pagination(page_data) -%}
+{% if page_data.pages > 1 %}
+<nav class="flex items-center justify-between gap-3 mt-6 text-sm" aria-label="Страницы">
+    {% if page_data.prev_url %}<a href="{{ page_data.prev_url }}" class="btn btn-ghost btn-sm">← Назад</a>{% else %}<span></span>{% endif %}
+    <span class="text-ink-muted">{{ page_data.page }} из {{ page_data.pages }}</span>
+    {% if page_data.next_url %}<a href="{{ page_data.next_url }}" class="btn btn-ghost btn-sm">Вперёд →</a>{% else %}<span></span>{% endif %}
+</nav>
+{% endif %}
+{%- endmacro %}

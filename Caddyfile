@@ -1,0 +1,31 @@
+{$DOMAIN} {
+    # Лимиты на IP клиента. Вход и регистрация — жёстче всего: это то, что
+    # перебирают. В приложении своего ограничителя нет (нет Redis), поэтому
+    # граница здесь.
+    rate_limit {
+        zone general {
+            key {remote_host}
+            events 300
+            window 1m
+        }
+        zone api {
+            key {remote_host}
+            events 120
+            window 1m
+            match {
+                path /api/public/v1/*
+            }
+        }
+        zone auth {
+            key {remote_host}
+            events 10
+            window 1m
+            match {
+                method POST
+                path /login /login/submit /register/submit /api/public/v1/auth/*
+            }
+        }
+    }
+
+    reverse_proxy web:8000
+}

@@ -1,0 +1,221 @@
+@import 'tailwindcss';
+
+@source '../app/templates/**/*.html';
+@source '../app/web/**/*.py';
+@source '../static/js/**/*.js';
+
+/* Цвета — только токенами: смена палитры проекта правит этот блок,
+   а не классы по всем шаблонам. */
+@theme {
+    --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif,
+        'Apple Color Emoji', 'Segoe UI Emoji';
+
+    --color-brand-50: #eef2ff;
+    --color-brand-100: #e0e7ff;
+    --color-brand-500: #6366f1;
+    --color-brand-600: #4f46e5;
+    --color-brand-700: #4338ca;
+
+    --color-canvas: #f6f7f9;
+    --color-surface: #ffffff;
+    --color-surface-muted: #f1f3f6;
+    --color-ink: #16181d;
+    --color-ink-muted: #5b616e;
+    --color-ink-dim: #8a909c;
+    --color-line: #e2e5ea;
+    --color-danger: #dc2626;
+    --color-on-brand: #ffffff;
+
+    --radius-md: 8px;
+    --radius-lg: 12px;
+
+    --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.07);
+    --shadow-pop: 0 24px 60px rgba(16, 24, 40, 0.16);
+}
+
+@layer base {
+    body {
+        font-family: var(--font-sans);
+        -webkit-font-smoothing: antialiased;
+    }
+    [x-cloak] { display: none !important; }
+
+    /* Фокус с клавиатуры виден везде. :where не добавляет специфичности,
+       поэтому свой фокус компонента перекрывает этот. */
+    :where(a, button, summary, [tabindex]):focus-visible {
+        outline: 2px solid var(--color-brand-600);
+        outline-offset: 2px;
+        border-radius: 4px;
+    }
+}
+
+@layer components {
+    .page-title { font-size: 1.875rem; font-weight: 800; letter-spacing: -0.02em; }
+    .link { color: var(--color-brand-600); font-weight: 500; }
+    .link:hover { text-decoration: underline; }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.625rem 1.125rem;
+        border-radius: var(--radius-md);
+        border: 1px solid transparent;
+        font-weight: 600;
+        font-size: 0.9375rem;
+        line-height: 1;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: background .15s ease, border-color .15s ease, color .15s ease;
+    }
+    .btn-sm { padding: 0.5rem 0.75rem; font-size: 0.8125rem; }
+    .btn-primary { background: var(--color-brand-600); color: var(--color-on-brand); }
+    .btn-primary:hover { background: var(--color-brand-700); }
+    .btn-ghost { background: var(--color-surface); border-color: var(--color-line); color: var(--color-ink); }
+    .btn-ghost:hover { background: var(--color-surface-muted); }
+    .btn-danger { background: var(--color-danger); color: #fff; }
+    .btn-danger:hover { filter: brightness(0.92); }
+
+    .card {
+        background: var(--color-surface);
+        border: 1px solid var(--color-line);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+    }
+
+    .label-field {
+        display: block;
+        margin-bottom: 0.375rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+    .input-field {
+        width: 100%;
+        padding: 0.625rem 0.75rem;
+        border: 1px solid var(--color-line);
+        border-radius: var(--radius-md);
+        background: var(--color-surface);
+        color: var(--color-ink);
+        font-size: 0.9375rem;
+    }
+    .input-field:focus { outline: none; border-color: var(--color-brand-500); box-shadow: 0 0 0 3px var(--color-brand-100); }
+    .input-field[aria-invalid='true'] { border-color: var(--color-danger); }
+
+    .menu-item { display: block; padding: 0.625rem 1rem; font-size: 0.875rem; }
+    .menu-item:hover { background: var(--color-surface-muted); }
+
+    .table { width: 100%; font-size: 0.875rem; }
+    .table th {
+        text-align: left;
+        padding: 0.75rem 1rem;
+        font-weight: 600;
+        color: var(--color-ink-muted);
+        border-bottom: 1px solid var(--color-line);
+    }
+    .table td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--color-line); vertical-align: middle; }
+    .table tr:last-child td { border-bottom: 0; }
+
+    .admin-nav-group {
+        padding: 0 0.75rem;
+        margin-bottom: 0.5rem;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: rgb(255 255 255 / 0.4);
+    }
+    .admin-nav-link { display: flex; padding: 0.5rem 0.75rem; border-radius: var(--radius-md); }
+    .admin-nav-link:hover { background: rgb(255 255 255 / 0.05); color: #fff; }
+    .admin-nav-link.is-active { background: rgb(255 255 255 / 0.1); color: #fff; }
+
+    /* Окно подтверждения и окно с формой вместо системных диалогов браузера
+       (CLAUDE.md §9.3). */
+    .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 70;
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+        background: rgb(0 0 0 / 0.45);
+    }
+    .modal-panel {
+        width: 100%;
+        max-width: 28rem;
+        padding: 1.5rem;
+        border-radius: var(--radius-lg);
+        background: var(--color-surface);
+        box-shadow: var(--shadow-pop);
+    }
+    .modal-title { font-size: 1.125rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .modal-text { color: var(--color-ink-muted); font-size: 0.9375rem; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem; }
+
+    /* Всплывающие сообщения (static/js/toasts.js). Правый нижний угол:
+       не накрывает шапку. */
+    .toast-stack {
+        position: fixed;
+        right: 1rem;
+        bottom: 1rem;
+        z-index: 80;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        max-width: min(24rem, calc(100vw - 2rem));
+        pointer-events: none;
+    }
+    .toast {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 0.75rem 0.875rem;
+        border-radius: var(--radius-lg);
+        background: var(--color-surface);
+        border: 1px solid var(--color-line);
+        border-left: 3px solid var(--color-ink-dim);
+        box-shadow: var(--shadow-pop);
+        pointer-events: auto;
+        animation: toast-in .18s ease-out;
+    }
+    .toast--error { border-left-color: var(--color-danger); }
+    .toast--success { border-left-color: var(--color-brand-500); }
+    /* Точка перед текстом: цвет полоски слева виден не всем и не всегда,
+       а метка рядом со словами читается сразу. */
+    .toast__mark {
+        flex-shrink: 0;
+        width: 0.5rem;
+        height: 0.5rem;
+        margin-top: 0.4rem;
+        border-radius: 9999px;
+        background: var(--color-ink-dim);
+    }
+    .toast--error .toast__mark { background: var(--color-danger); }
+    .toast--success .toast__mark { background: var(--color-brand-500); }
+    .toast__text { flex: 1; font-size: 0.875rem; line-height: 1.4; }
+    .toast__close {
+        flex-shrink: 0;
+        width: 1.25rem;
+        height: 1.25rem;
+        border-radius: 9999px;
+        color: var(--color-ink-dim);
+        cursor: pointer;
+        line-height: 1;
+        display: grid;
+        place-items: center;
+    }
+    .toast__close:hover { background: var(--color-surface-muted); color: var(--color-ink); }
+    .toast.is-leaving {
+        opacity: 0;
+        transform: translateY(0.25rem);
+        transition: opacity .18s ease, transform .18s ease;
+    }
+    @keyframes toast-in {
+        from { opacity: 0; transform: translateY(0.5rem); }
+        to { opacity: 1; transform: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .toast { animation: none; }
+        .toast.is-leaving { transition: none; }
+    }
+}

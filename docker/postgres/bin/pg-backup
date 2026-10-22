@@ -1,0 +1,12 @@
+#!/bin/sh
+# Полный бэкап и проверка, что WAL доезжает до репозитория. По расписанию
+# его вызывает pg-backup-scheduler, руками:
+#   docker exec postgres_backup pg-backup
+
+set -eu
+
+STANZA=main
+
+pgbackrest --stanza="$STANZA" --type=full backup
+pgbackrest --stanza="$STANZA" check
+pgbackrest --stanza="$STANZA" info

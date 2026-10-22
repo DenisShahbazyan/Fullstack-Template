@@ -1,0 +1,44 @@
+#!/bin/sh
+# Проверка, что из бэкапа поднимается живая база. Восстанавливает во
+# временный каталог со своим сокетом, рабочую базу не трогает:
+#   docker exec postgres_backup pg-restore-check
+# Необязательный аргумент — момент времени: "2026-10-17 20:04:00+03".
+
+set -eu
+
+STANZA=main
+RESTORE_DIR=/tmp/pg-restore-check
+SOCKET_DIR=/tmp
+
+cleanup() {
+    pg_ctl -D "$RESTORE_DIR" -m immediate stop >/dev/null 2>&1 || true
+    rm -rf "$RESTORE_DIR" "$RESTORE_DIR.log"
+}
+trap cleanup EXIT
+cleanup
+
+if [ -n "${1:-}" ]; then
+    pgbackrest --stanza="$STANZA" --pg1-path="$RESTORE_DIR" \
+        --type=time --target="$1" --target-action=promote restore
+else
+    pgbackrest --stanza="$STANZA" --pg1-path="$RESTORE_DIR" restore
+fi
+
+# archive_mode=off обязателен: иначе восстановленная копия начнёт писать
+# свои WAL в тот же репозиторий, что и рабочая база.
+pg_ctl -D "$RESTORE_DIR" -l "$RESTORE_DIR.log" -w -t 3600 start \
+    -o "-c archive_mode=off -c listen_addresses='' -c unix_socket_directories=$SOCKET_DIR"
+
+# pg_ctl возвращается, как только база пускает на чтение, а WAL ещё
+# докатывается. Проверять копию можно только после promote.
+until [ "$(psql -h "$SOCKET_DIR" -U "$POSTGRES_USER" -d postgres -XAtc 'SELECT pg_is_in_recovery()')" = f ]; do
+    sleep 1
+done
+
+grep -E 'recovery stopping|last completed transaction' "$RESTORE_DIR.log" || true
+psql -h "$SOCKET_DIR" -U "$POSTGRES_USER" -d postgres -X -c "
+    SELECT datname, pg_size_pretty(pg_database_size(datname)) AS size
+    FROM pg_database WHERE NOT datistemplate ORDER BY datname;"
+
+pg_ctl -D "$RESTORE_DIR" -w stop
+echo "Восстановление прошло успешно."

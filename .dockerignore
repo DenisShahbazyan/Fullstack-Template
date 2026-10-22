@@ -1,0 +1,80 @@
+# ── Секреты ─────────────────────────────────────────────────────────
+# В контейнер переменные приходят через env_file в docker compose,
+# класть файлы с секретами в слои образа не нужно.
+.env
+.env.*
+!.env.template
+
+# ── Git и CI ────────────────────────────────────────────────────────
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# ── Python ──────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+*.egg-info/
+build/
+dist/
+
+# ── Кеши инструментов ───────────────────────────────────────────────
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.ty_cache/
+.cache/
+.hypothesis/
+.tox/
+.nox/
+
+# ── Тесты и покрытие ────────────────────────────────────────────────
+tests/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.cover
+
+# ── Инфраструктура (не нужна внутри образа) ─────────────────────────
+Dockerfile
+.dockerignore
+docker-compose*.yml
+Caddyfile
+Makefile
+
+# ── Документация ────────────────────────────────────────────────────
+docs/
+README.md
+CLAUDE.md
+*.md
+!app/crud/crud_methods_description.md
+
+# ── Редакторы и ОС ──────────────────────────────────────────────────
+.vscode/
+.idea/
+.claude/
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# ── Локальные артефакты ─────────────────────────────────────────────
+*.log
+dump.rdb
+*.sqlite3
+*.db
+
+# ── Фронтенд ────────────────────────────────────────────────────────
+# Бинарь tailwind скачивается под архитектуру контейнера на этапе сборки,
+# локальный (macOS) внутри не запустится. input.css при этом нужен.
+tailwind/tailwindcss
+node_modules/
+
+# CSS собирается в Dockerfile из tailwind/input.css
+static/css/app.css

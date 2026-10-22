@@ -1,0 +1,53 @@
+{% extends 'admin/base.html' %}
+{% from 'public/macros/pagination.html' import pagination %}
+
+{% block heading %}Пользователи{% endblock %}
+
+{% block content %}
+<form method="get" action="/admin/users" class="flex flex-wrap gap-2 mb-4">
+    <input class="input-field max-w-xs" type="search" name="search" value="{{ search }}" placeholder="Email или имя">
+    <select class="input-field max-w-[12rem]" name="role">
+        <option value="">Все роли</option>
+        {% for role in roles %}
+            <option value="{{ role.value }}" {% if selected_role == role %}selected{% endif %}>{{ role.value }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-ghost">Найти</button>
+</form>
+
+<div class="card overflow-x-auto">
+    <table class="table">
+        <thead>
+            <tr><th>ID</th><th>Email</th><th>Имя</th><th>Зарегистрирован</th><th>Роль</th></tr>
+        </thead>
+        <tbody>
+        {% for user in users %}
+            <tr>
+                <td>{{ user.id }}</td>
+                <td>{{ user.email }}</td>
+                <td>{{ user|full_name }}</td>
+                <td>{{ user.created_at.strftime('%d.%m.%Y') }}</td>
+                <td>
+                    {% if user.id == current_user.id %}
+                        {{ user.role.value }}
+                    {% else %}
+                    <form method="post" action="/admin/users/{{ user.id }}/role" class="flex gap-2">
+                        <input type="hidden" name="token_key" value="{{ csrf_token }}">
+                        <select class="input-field py-1" name="role">
+                            {% for role in roles %}
+                                <option value="{{ role.value }}" {% if user.role == role %}selected{% endif %}>{{ role.value }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-ghost btn-sm">Сохранить</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+        {% else %}
+            <tr><td colspan="5" class="text-center text-ink-muted">Никого не нашлось</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{{ pagination(page_data) }}
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends 'public/base.html' %}
+
+{% block title %}Вход — {{ site_name }}{% endblock %}
+
+{% block content %}
+<section class="max-w-md mx-auto px-4 md:px-6 py-10 md:py-16">
+    <h1 class="page-title mb-6">Вход</h1>
+    <form method="post" action="/login/submit" class="card p-4 sm:p-6 space-y-4">
+        <input type="hidden" name="token_key" value="{{ csrf_token }}">
+        <input type="hidden" name="next" value="{{ next_url|default('/') }}">
+        <div>
+            <label class="label-field" for="email">Email</label>
+            <input class="input-field" type="email" id="email" name="email"
+                   value="{{ form.email if form else '' }}"
+                   required autocomplete="email"
+                   {% if toast %}aria-invalid="true" autofocus{% endif %}>
+        </div>
+        <div>
+            <label class="label-field" for="password">Пароль</label>
+            <input class="input-field" type="password" id="password" name="password"
+                   required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary w-full">Войти</button>
+    </form>
+    <p class="text-sm text-ink-muted text-center mt-4">
+        Нет аккаунта? <a href="/register" class="link">Зарегистрироваться</a>
+    </p>
+</section>
+{% endblock %}

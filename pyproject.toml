@@ -1,0 +1,122 @@
+##########################################
+#                  Ruff                  #
+##########################################
+[tool.ruff]
+exclude = [
+    # Ruff standard
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+    # MyFiles
+    "__pycache__/*",
+    "alembic/*",
+]
+
+# Same as Black.
+line-length = 88
+indent-width = 4
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "C",   # mccabe
+    "N",   # pep8-naming
+    "I",   # isort
+    "A",   # flake8-builtins
+    "C4",  # flake8-comprehensions
+    "PIE", # flake8-pie
+    "Q",   # flake8-quotes
+]
+ignore = []
+
+# Настройки flake8-quotes
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+inline-quotes = "single"
+
+# # Настройки форматирования (замена black)
+[tool.ruff.format]
+quote-style = "single"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+
+##########################################
+#                   Ty                   #
+##########################################
+[tool.ty.rules]
+invalid-argument-type = "ignore"
+
+[[tool.ty.overrides]]
+include = ["app/crud/_base.py"]
+rules = { possibly-missing-attribute = "ignore", unresolved-attribute = "ignore" }
+
+[tool.ty.src]
+exclude = ["tests/**"]
+
+##########################################
+#                 PyTest                 #
+##########################################
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = [".", "app"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+
+
+##########################################
+#                   UV                   #
+##########################################
+[project]
+name = "myproject"
+version = "0.1.0"
+description = "FastAPI + SSR (Jinja2, HTMX, Alpine.js, Tailwind CSS)"
+readme = "README.md"
+requires-python = ">=3.14.3"
+dependencies = [
+    "alembic>=1.19.2",
+    "asyncpg>=0.31.0",
+    "fastapi-csrf-protect==1.0.7",
+    "fastapi-users[sqlalchemy]>=15.0.5",
+    "fastapi[standard]>=0.136.0",
+    "granian>=2.8.2",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.15.0",
+    "python-json-logger>=4.1.0",
+    "sqlalchemy>=2.0.52",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.2",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.6",
+    "ty>=0.0.78",
+]

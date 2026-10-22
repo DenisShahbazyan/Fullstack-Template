@@ -1,0 +1,49 @@
+#!/bin/sh
+# Расписание бэкапов, процесс сервиса backup в docker-compose.yml.
+# Раз в сутки (UTC) снимает полный бэкап. После первого бэкапа и по
+# воскресеньям проверяет восстановление. Отметку «сегодня уже было» берёт
+# из самого репозитория, поэтому перезапуск при деплое бэкап не повторяет.
+
+set -u
+
+STANZA=main
+RETRY_SECONDS=3600
+
+notify() {
+    [ -n "${BACKUP_PING_URL:-}" ] || return 0
+    curl -fsS -m 10 --retry 3 -o /dev/null "${BACKUP_PING_URL}$1" || true
+}
+
+last_backup_day() {
+    stop=$(pgbackrest --stanza="$STANZA" --output=json info \
+        | jq -r '[.[0].backup[]? | select(.type == "full")] | last | .timestamp.stop // empty')
+    [ -n "$stop" ] && date -u -d "@$stop" +%F
+}
+
+run_backup() {
+    pg-backup || { notify /fail; return 1; }
+    if [ -z "$1" ] || [ "$(date -u +%u)" = 7 ]; then
+        pg-restore-check || { notify /fail; return 1; }
+    fi
+    notify ""
+}
+
+if [ -z "${PGBACKREST_REPO1_S3_BUCKET:-}" ]; then
+    echo "Раздел BACKUPS в .env.docker не заполнен, бэкапы выключены."
+    while :; do sleep 3600; done
+fi
+
+until pg_isready -q; do sleep 5; done
+
+until pgbackrest --stanza="$STANZA" stanza-create; do
+    notify /fail
+    sleep "$RETRY_SECONDS"
+done
+
+while :; do
+    last=$(last_backup_day)
+    if [ "$last" != "$(date -u +%F)" ] && ! run_backup "$last"; then
+        sleep "$RETRY_SECONDS"
+    fi
+    sleep 60
+done

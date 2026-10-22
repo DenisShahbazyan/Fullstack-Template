@@ -1,0 +1,54 @@
+# Прод-сборка на своей машине: тот же образ приложения, что уедет на сервер,
+# но обычный Postgres без бэкапов и без Caddy. `make docker-up`.
+services:
+  db:
+    image: postgres:18.0-alpine
+    container_name: postgres
+    restart: always
+    volumes:
+      - postgres_data:/var/lib/postgresql/
+    ports:
+      # Не 5432: на машине разработчика он часто занят локальным Postgres.
+      - "127.0.0.1:15432:5432"
+    networks:
+      - app_network
+    env_file:
+      - .env.docker
+
+  migrate:
+    build: .
+    container_name: fastapi_migrate
+    restart: "no"
+    depends_on:
+      - db
+    entrypoint: ["./scripts/migrate.sh"]
+    networks:
+      - app_network
+    env_file:
+      - .env.docker
+
+  web:
+    build: .
+    container_name: fastapi
+    restart: always
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    entrypoint: ["./scripts/start.sh"]
+    ports:
+      - "8000:8000"
+    networks:
+      - app_network
+    env_file:
+      - .env.docker
+    environment:
+      # Локально без https: Secure-cookie браузер по http не вернёт.
+      JWT__COOKIE_SECURE: "false"
+      CSRF__COOKIE_SECURE: "false"
+
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  postgres_data:

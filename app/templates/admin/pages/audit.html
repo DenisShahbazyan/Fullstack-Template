@@ -1,0 +1,28 @@
+{% extends 'admin/base.html' %}
+{% from 'public/macros/pagination.html' import pagination %}
+
+{% block heading %}Аудит{% endblock %}
+
+{% block content %}
+<div class="card overflow-x-auto">
+    <table class="table">
+        <thead>
+            <tr><th>Когда</th><th>Кто</th><th>Действие</th><th>Объект</th><th>Детали</th></tr>
+        </thead>
+        <tbody>
+        {% for record in records %}
+            <tr>
+                <td class="whitespace-nowrap">{{ record.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                <td>{{ record.actor_user.email }}</td>
+                <td>{{ record.action.value }}</td>
+                <td>{{ record.object_type }} #{{ record.object_id }}</td>
+                <td class="text-ink-muted font-mono text-xs">{{ record.payload|tojson }}</td>
+            </tr>
+        {% else %}
+            <tr><td colspan="5" class="text-center text-ink-muted">Записей пока нет</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{{ pagination(page_data) }}
+{% endblock %}

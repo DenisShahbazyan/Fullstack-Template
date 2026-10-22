@@ -1,0 +1,160 @@
+name: CI/CD
+
+# Файл одинаковый во всех проектах. Всё, что отличается между ними
+# (пользователь Docker Hub и имя образа/проекта), берётся из .env.docker —
+# того же файла, из которого docker-compose.yml подставляет имя образа.
+
+on:
+  push:
+    branches: [main, master]
+
+jobs:
+  lint:
+    name: Ruff and ty
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Ruff
+        run: |
+          uv run ruff check app tests scripts
+          uv run ruff format --check app tests scripts
+
+      - name: ty
+        run: uv run ty check app
+
+  config:
+    name: Read project config
+    runs-on: ubuntu-latest
+    outputs:
+      project: ${{ steps.env.outputs.project }}
+      image: ${{ steps.env.outputs.image }}
+      postgres_image: ${{ steps.env.outputs.postgres_image }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      # Docker Hub требует репозиторий в нижнем регистре: сегмент с заглавной
+      # буквой парсится как хост реестра, а не как имя пользователя.
+      - name: Read .env.docker
+        id: env
+        run: |
+          # Читаем только нужные ключи: source всего файла сломался бы на
+          # значениях с пробелами или $ (пароли, ключи).
+          get() { grep -E "^$1=" .env.docker | tail -1 | cut -d= -f2- | tr -d "\"'\r"; }
+          DOCKER_USERNAME=$(get DOCKER_USERNAME)
+          DOCKER_IMAGE_NAME=$(get DOCKER_IMAGE_NAME)
+          : "${DOCKER_USERNAME:?DOCKER_USERNAME is not set in .env.docker}"
+          : "${DOCKER_IMAGE_NAME:?DOCKER_IMAGE_NAME is not set in .env.docker}"
+          user=$(echo "$DOCKER_USERNAME" | tr '[:upper:]' '[:lower:]')
+          echo "project=$DOCKER_IMAGE_NAME" >> "$GITHUB_OUTPUT"
+          echo "image=$user/$DOCKER_IMAGE_NAME:latest" >> "$GITHUB_OUTPUT"
+          echo "postgres_image=$user/$DOCKER_IMAGE_NAME-postgres:latest" >> "$GITHUB_OUTPUT"
+
+  copy_infra_to_server:
+    name: Copy docker-compose.yml and Caddyfile
+    runs-on: ubuntu-latest
+    needs: config
+    env:
+      PROJECT_DIR: /home/${{ secrets.SERVER_USER }}/${{ needs.config.outputs.project }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Create project directory
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          script: |
+            mkdir -p ${{ env.PROJECT_DIR }}/
+
+      - name: Prepare files for transfer
+        run: |
+          mkdir transfer
+          cp docker-compose.yml Caddyfile .env.docker transfer/
+
+      - name: Copy files
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          source: "transfer/"
+          target: ${{ env.PROJECT_DIR }}/
+          strip_components: 1
+
+  build_and_push_to_docker_hub:
+    name: Push Docker image to Docker Hub
+    runs-on: ubuntu-latest
+    needs: [lint, config]
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.4.1
+
+      - name: Login to Docker
+        uses: docker/login-action@v4.6.0
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Push to Docker Hub
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          push: true
+          tags: ${{ needs.config.outputs.image }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Свой образ Postgres есть не во всех проектах: шаг выполняется,
+      # только если в репозитории лежит docker/postgres/Dockerfile.
+      - name: Push Postgres image to Docker Hub
+        if: hashFiles('docker/postgres/Dockerfile') != ''
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: docker/postgres
+          push: true
+          tags: ${{ needs.config.outputs.postgres_image }}
+          cache-from: type=gha,scope=postgres
+          cache-to: type=gha,mode=max,scope=postgres
+
+  deploy:
+    name: Deploy to server
+    runs-on: ubuntu-latest
+    needs: [config, copy_infra_to_server, build_and_push_to_docker_hub]
+    if: github.ref_name == github.event.repository.default_branch
+    steps:
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          script: |
+            set -e
+            cd /home/${{ secrets.SERVER_USER }}/${{ needs.config.outputs.project }}/
+
+            echo "${{ secrets.DOCKER_PASSWORD }}" | sudo docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+            # env_file отдаёт значения только внутрь контейнера, а интерполяция
+            # ${...} в самом compose-файле берёт их из --env-file. sudo вычищает
+            # окружение (sudoers без setenv), поэтому передаём файл явно.
+            sudo docker compose --env-file .env.docker pull
+            sudo docker compose --env-file .env.docker down --remove-orphans
+            sudo docker compose --env-file .env.docker up -d
+
+            # Пуш перезаписывает тег :latest, и предыдущий образ остаётся на
+            # диске без тега. За десяток деплоев это гигабайты. Без -a: чистим
+            # только dangling, образы с тегами (postgres, caddy и т.п.) нужны.
+            sudo docker image prune -f

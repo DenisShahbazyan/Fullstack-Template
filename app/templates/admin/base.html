@@ -1,0 +1,95 @@
+{% set is_admin = current_user and current_user.role|string == 'admin' %}
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <meta name="robots" content="noindex">
+    <title>{% block title %}Админка — {{ site_name }}{% endblock %}</title>
+
+    <link rel="stylesheet" href="/static/css/app.css?v={{ static_version('css/app.css') }}">
+    <script src="/static/js/htmx.min.js?v={{ static_version('js/htmx.min.js') }}"></script>
+    <script src="/static/js/alpine.min.js?v={{ static_version('js/alpine.min.js') }}" defer></script>
+    <script src="/static/js/csrf.js?v={{ static_version('js/csrf.js') }}" defer></script>
+    <script src="/static/js/toasts.js?v={{ static_version('js/toasts.js') }}" defer></script>
+    <script>
+        document.addEventListener('htmx:afterSwap', (event) => {
+            if (window.Alpine) Alpine.initTree(event.detail.target);
+        });
+    </script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="min-h-screen bg-surface-muted text-ink"
+      x-data="{ nav: false }" @keydown.escape.window="nav = false">
+    {% set work_items = [
+        ('/admin', 'Панель', 'dashboard'),
+    ] %}
+    {% set system_items = [
+        ('/admin/users', 'Пользователи', 'users'),
+        ('/admin/audit', 'Аудит', 'audit'),
+    ] %}
+    {% set active = active_nav|default('') %}
+
+    <div class="flex min-h-screen">
+        {#- Подложка под выдвинутым сайдбаром: на узком экране он лежит поверх
+            контента, и клик мимо должен его закрывать. -#}
+        <div x-show="nav" x-cloak x-transition.opacity @click="nav = false"
+             class="fixed inset-0 z-40 bg-ink/50 lg:hidden" aria-hidden="true"></div>
+
+        <aside class="fixed inset-y-0 left-0 z-50 w-64 shrink-0 -translate-x-full transition-transform
+                      lg:sticky lg:top-0 lg:h-screen lg:self-start lg:translate-x-0
+                      bg-ink text-white/70 flex flex-col"
+               :class="nav && 'translate-x-0'">
+            <a href="/admin" class="h-16 flex items-center px-6 border-b border-white/10 text-white font-bold">
+                {{ site_name }}
+                <span class="ml-auto text-[10px] uppercase tracking-widest text-white/40">admin</span>
+            </a>
+            <nav class="flex-1 overflow-y-auto py-4 px-3 text-sm" @click="nav = false">
+                <div class="mb-4">
+                    <div class="admin-nav-group">Работа</div>
+                    {% for url, label, key in work_items %}
+                        <a href="{{ url }}" class="admin-nav-link {% if active == key %}is-active{% endif %}">{{ label }}</a>
+                    {% endfor %}
+                </div>
+                {% if is_admin %}
+                <div class="mb-4">
+                    <div class="admin-nav-group">Система</div>
+                    {% for url, label, key in system_items %}
+                        <a href="{{ url }}" class="admin-nav-link {% if active == key %}is-active{% endif %}">{{ label }}</a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </nav>
+            <div class="border-t border-white/10 px-4 py-4">
+                {% if current_user %}
+                    <div class="text-xs truncate mb-2">{{ current_user.email }}</div>
+                {% endif %}
+                <a href="/" class="block text-xs hover:text-white transition-colors">← На сайт</a>
+            </div>
+        </aside>
+
+        <div class="flex-1 min-w-0 flex flex-col">
+            <header class="h-16 bg-surface border-b border-line flex items-center gap-3 px-4 md:px-8 sticky top-0 z-30">
+                <button type="button" @click="nav = true" aria-label="Открыть меню"
+                        class="lg:hidden shrink-0 -ml-1 p-2 rounded-lg text-ink-muted hover:bg-surface-muted">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                        <path d="M3 6h18M3 12h18M3 18h18"/>
+                    </svg>
+                </button>
+                <h1 class="font-bold text-base md:text-lg truncate">{% block heading %}{% endblock %}</h1>
+                <div class="ml-auto flex items-center gap-2 md:gap-3 shrink-0">{% block actions %}{% endblock %}</div>
+            </header>
+            <main class="flex-1 p-4 md:p-8">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+{#- Сообщение из ?toast=: скрипт заберёт его и покажет всплывашкой. -#}
+{% if toast %}
+<div hidden data-toast="{{ toast }}" data-toast-kind="{{ toast_kind }}"></div>
+{% endif %}
+</body>
+</html>
