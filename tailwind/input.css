@@ -130,7 +130,7 @@
     .admin-nav-link.is-active { background: rgb(255 255 255 / 0.1); color: #fff; }
 
     /* Окно подтверждения и окно с формой вместо системных диалогов браузера
-       (CLAUDE.md §9.3). */
+       (скилл frontend). */
     .modal-backdrop {
         position: fixed;
         inset: 0;

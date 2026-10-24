@@ -19,3 +19,12 @@ repos:
         args: [--fix]
       # Run the formatter.
       - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: no-browser-dialogs
+        name: no alert/confirm/prompt/hx-confirm
+        entry: scripts/checks/no_browser_dialogs.sh
+        language: script
+        files: ^(app/templates/|static/js/)
+        exclude: \.min\.js$

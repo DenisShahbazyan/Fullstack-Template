@@ -40,7 +40,7 @@
 
 3. Заполнить `.env.docker`: `DOCKER_USERNAME`, `DOMAIN`, все `change-me` (пароли и секреты — `openssl rand -base64 48`), `POSTGRES_USER`/`POSTGRES_PASSWORD` совпадают с `DB__USERNAME`/`DB__PASSWORD`. Раздел `BACKUPS` — по [docs/guide/ops/backups.md](docs/guide/ops/backups.md). Файл коммитится вместе с секретами — **репозиторий должен быть приватным**.
 4. В `.env.local` сгенерировать свои `JWT__SECRET` и `CSRF__SECRET` (`openssl rand -hex 32`).
-5. Заполнить §0 и §19 в `CLAUDE.md`, `docs/spec/v01.md`, `docs/plan/mvp.md`.
+5. Заполнить §0 и §2 (предметная часть) в `CLAUDE.md`, `docs/spec/v01.md`, `docs/plan/mvp.md`.
 6. Палитру сайта — токены `@theme` в `tailwind/input.css`.
 7. Первая миграция `alembic/versions/…_first_migration.py` уже есть. Новые модели — `make revision m="..."`.
 
