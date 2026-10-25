@@ -1,4 +1,11 @@
 {$DOMAIN} {
+    # Тело запроса режем до приложения: Starlette принимает multipart целиком,
+    # и только потом read_upload сверяет MAX_UPLOAD_BYTES (20 МБ). Без этой
+    # границы один запрос на гигабайты забьёт диск контейнера.
+    request_body {
+        max_size 25MB
+    }
+
     # Лимиты на IP клиента. Вход и регистрация — жёстче всего: это то, что
     # перебирают. В приложении своего ограничителя нет (нет Redis), поэтому
     # граница здесь.
@@ -23,6 +30,16 @@
             match {
                 method POST
                 path /login /login/submit /register/submit /api/public/v1/auth/*
+            }
+        }
+        # Каждая загрузка — файл в S3 до ночной чистки сирот.
+        zone upload {
+            key {remote_host}
+            events 20
+            window 10m
+            match {
+                method POST
+                path /api/public/v1/files/upload
             }
         }
     }
