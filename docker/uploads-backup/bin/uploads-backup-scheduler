@@ -15,9 +15,9 @@ STATE="$DST/state/last-success"
 
 RETENTION_DAYS=30
 RETRY_SECONDS=3600
-# Временные загрузки (S3__TMP_PATH) не принятые записью, удаляет uploads_sweep:
-# в копии они не нужны.
-EXCLUDE="tmp/**"
+# Временные загрузки, не принятые записью, удаляет uploads_sweep: в копии они
+# не нужны. Папка — S3__TMP_PATH сайта, приходит из docker-compose.yml.
+EXCLUDE="${UPLOADS_BACKUP_TMP_PATH:-tmp}/**"
 # Файл, загруженный за минуты до проверки, мог не попасть в синхронизацию.
 CHECK_MIN_AGE=10m
 
