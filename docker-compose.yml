@@ -16,12 +16,13 @@ services:
     # Архивация задаётся здесь, а не ALTER SYSTEM: postgresql.auto.conf попал
     # бы в бэкап, и проверочная копия при восстановлении начала бы писать WAL
     # в тот же репозиторий. Порядок восстановления — docs/guide/ops/backups.md.
+    # pg-archive-push молча отбрасывает WAL, пока раздел BACKUPS пуст.
     command:
       - postgres
       - -c
       - archive_mode=on
       - -c
-      - archive_command=pgbackrest --stanza=main archive-push %p
+      - archive_command=pg-archive-push %p
       - -c
       - archive_timeout=300s
     volumes:

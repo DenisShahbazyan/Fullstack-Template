@@ -1,0 +1,9 @@
+#!/bin/sh
+# archive_command сервиса db. Пока раздел BACKUPS в .env.docker пуст, WAL
+# некуда отправлять, а бэкапов, которым он нужен, всё равно нет: сегмент
+# отбрасываем. Иначе Postgres копил бы его в pg_wal до конца диска.
+# Как только бакет задан, сегмент уходит в репозиторий как обычно; пока
+# backup не создал stanza, archive-push падает и Postgres сегмент держит.
+
+[ -n "${PGBACKREST_REPO1_S3_BUCKET:-}" ] || exit 0
+exec pgbackrest --stanza=main archive-push "$1"

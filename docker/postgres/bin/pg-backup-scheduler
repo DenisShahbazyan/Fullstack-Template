@@ -3,15 +3,30 @@
 # Раз в сутки (UTC) снимает полный бэкап. После первого бэкапа и по
 # воскресеньям проверяет восстановление. Отметку «сегодня уже было» берёт
 # из самого репозитория, поэтому перезапуск при деплое бэкап не повторяет.
+# Раз в час смотрит, доходят ли WAL до репозитория: сломанная архивация
+# раздувает pg_wal до конца диска, и ждать ночного check — до суток.
 
 set -u
 
 STANZA=main
 RETRY_SECONDS=3600
+ARCHIVE_CHECK_SECONDS=3600
 
 notify() {
     [ -n "${BACKUP_PING_URL:-}" ] || return 0
     curl -fsS -m 10 --retry 3 -o /dev/null "${BACKUP_PING_URL}$1" || true
+}
+
+# Архивация сломана, если последняя неудача позже последнего успеха.
+# Успех heartbeat не шлём: он скрыл бы, что сам бэкап не запускается.
+check_archiving() {
+    failing=$(psql -U "$PGBACKREST_PG1_USER" -d postgres -XAtc "
+        SELECT coalesce(last_failed_time > coalesce(last_archived_time, 'epoch'), false)
+        FROM pg_stat_archiver") || { notify /fail; return; }
+    if [ "$failing" = t ]; then
+        echo "WAL не уходят в репозиторий: см. ошибки archive-push в docker logs postgres."
+        notify /fail
+    fi
 }
 
 last_backup_day() {
@@ -40,7 +55,12 @@ until pgbackrest --stanza="$STANZA" stanza-create; do
     sleep "$RETRY_SECONDS"
 done
 
+next_archive_check=0
 while :; do
+    if [ "$(date +%s)" -ge "$next_archive_check" ]; then
+        check_archiving
+        next_archive_check=$(( $(date +%s) + ARCHIVE_CHECK_SECONDS ))
+    fi
     last=$(last_backup_day)
     if [ "$last" != "$(date -u +%F)" ] && ! run_backup "$last"; then
         sleep "$RETRY_SECONDS"

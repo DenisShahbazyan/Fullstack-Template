@@ -10,12 +10,31 @@ STANZA=main
 RESTORE_DIR=/tmp/pg-restore-check
 SOCKET_DIR=/tmp
 
+# Копия ложится на тот же диск, что и рабочая база. После неё на диске должен
+# остаться запас: базе нужно место под WAL, пока проверка идёт.
+MIN_FREE_AFTER_KB=$((2 * 1024 * 1024))
+
 cleanup() {
     pg_ctl -D "$RESTORE_DIR" -m immediate stop >/dev/null 2>&1 || true
     rm -rf "$RESTORE_DIR" "$RESTORE_DIR.log"
 }
+
+# Полтора размера базы: при восстановлении на момент времени к файлам бэкапа
+# добавляются докатываемые WAL.
+ensure_disk_space() {
+    size_kb=$(pgbackrest --stanza="$STANZA" --output=json info \
+        | jq -r '[.[0].backup[]?] | last | .info.size // 0 | . / 1024 | floor')
+    free_kb=$(df -Pk "$(dirname "$RESTORE_DIR")" | awk 'NR == 2 { print $4 }')
+    need_kb=$((size_kb * 3 / 2 + MIN_FREE_AFTER_KB))
+    if [ "$free_kb" -lt "$need_kb" ]; then
+        echo "Мало места для проверки: свободно $((free_kb / 1024)) МБ, нужно $((need_kb / 1024)) МБ." >&2
+        exit 1
+    fi
+}
+
 trap cleanup EXIT
 cleanup
+ensure_disk_space
 
 if [ -n "${1:-}" ]; then
     pgbackrest --stanza="$STANZA" --pg1-path="$RESTORE_DIR" \
@@ -39,6 +58,16 @@ grep -E 'recovery stopping|last completed transaction' "$RESTORE_DIR.log" || tru
 psql -h "$SOCKET_DIR" -U "$POSTGRES_USER" -d postgres -X -c "
     SELECT datname, pg_size_pretty(pg_database_size(datname)) AS size
     FROM pg_database WHERE NOT datistemplate ORDER BY datname;"
+
+# Поднявшийся кластер ещё не значит, что в нём наши данные: читаем таблицу
+# миграций самой базы приложения.
+revision=$(psql -h "$SOCKET_DIR" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -XAtc \
+    'SELECT version_num FROM alembic_version')
+if [ -z "$revision" ]; then
+    echo "В восстановленной базе $POSTGRES_DB нет ревизии миграций." >&2
+    exit 1
+fi
+echo "Ревизия миграций в копии: $revision"
 
 pg_ctl -D "$RESTORE_DIR" -w stop
 echo "Восстановление прошло успешно."
