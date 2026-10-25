@@ -41,7 +41,7 @@
 
 3. Заполнить `.env.docker`: `DOCKER_USERNAME`, `DOMAIN`, все `change-me` (пароли и секреты — `openssl rand -base64 48`), `POSTGRES_USER`/`POSTGRES_PASSWORD` совпадают с `DB__USERNAME`/`DB__PASSWORD`. Раздел `BACKUPS` — по [docs/guide/ops/backups.md](docs/guide/ops/backups.md), `UPLOADS BACKUP` — по [uploads-backups.md](docs/guide/ops/uploads-backups.md). `S3__*` — **свой бакет проекта** и ключ только к нему. Файл коммитится вместе с секретами — **репозиторий должен быть приватным**.
 4. В `.env.local` сгенерировать свои `JWT__SECRET` и `CSRF__SECRET` (`openssl rand -hex 32`) и вписать `S3__*` — отдельный dev-бакет проекта, не продовый и не от другого проекта.
-5. Заполнить §0 и §2 (предметная часть) в `CLAUDE.md`, `docs/spec/v01.md`, `docs/plan/mvp.md`; когда у проекта появятся файлы — ещё `.claude/skills/uploads/project.md`.
+5. Заполнить §0 и §2 (предметная часть) в `CLAUDE.md`, `docs/spec/v01.md`, `docs/plan/mvp.md`; `.claude/skills/backups/project.md`; когда у проекта появятся файлы — ещё `.claude/skills/uploads/project.md`.
 6. Палитру сайта — токены `@theme` в `tailwind/input.css`.
 7. Первая миграция `alembic/versions/…_first_migration.py` уже есть. Новые модели — `make revision m="..."`.
 
