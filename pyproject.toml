@@ -100,12 +100,14 @@ description = "FastAPI + SSR (Jinja2, HTMX, Alpine.js, Tailwind CSS)"
 readme = "README.md"
 requires-python = ">=3.14.3"
 dependencies = [
+    "aioboto3>=15.5.0",
     "alembic>=1.19.2",
     "asyncpg>=0.31.0",
     "fastapi-csrf-protect==1.0.7",
     "fastapi-users[sqlalchemy]>=15.0.5",
     "fastapi[standard]>=0.136.0",
     "granian>=2.8.2",
+    "pillow>=12.2.0",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.15.0",
     "python-json-logger>=4.1.0",

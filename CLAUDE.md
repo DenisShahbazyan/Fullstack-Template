@@ -8,7 +8,7 @@
 
 _TODO: одной строкой, что это за продукт._ Основная сущность — _TODO: `<Entity>`_.
 
-Python 3.14 · FastAPI · SQLAlchemy 2.0 + Alembic · PostgreSQL 18 (бэкапы pgBackRest в S3) · granian за Caddy · SSR: Jinja2 + HTMX + Alpine.js + Tailwind v4 · тайпчекер `ty` · Ruff. Очереди, Redis, поиска и хранилища файлов нет; понадобятся — ARQ + Redis, Meilisearch, S3 (не локальный диск).
+Python 3.14 · FastAPI · SQLAlchemy 2.0 + Alembic · PostgreSQL 18 (бэкапы pgBackRest в S3) · S3 для загрузок (свой приватный бакет у проекта, копия — rclone к другому провайдеру) · granian за Caddy · SSR: Jinja2 + HTMX + Alpine.js + Tailwind v4 · тайпчекер `ty` · Ruff. Очереди, Redis и поиска нет; понадобятся — ARQ + Redis, Meilisearch.
 
 Сущности:
 
@@ -31,6 +31,7 @@ Python 3.14 · FastAPI · SQLAlchemy 2.0 + Alembic · PostgreSQL 18 (бэкап�
 - **Изменяющее действие администрации пишется в аудит**: новое значение `AuditActionEnum` + `record_action(...)` (`core/admin/audit.py`) в той же сессии и том же коммите.
 - Меняешь **схему БД** (модель, индекс, enum, миграция) → скилл `migrations`. Схему описывают модели, а не миграции.
 - Шаблон, форма, HTMX-роут, вёрстка, JS → скилл `frontend`.
+- Файл в S3 (новое поле, папка, загрузка, показ, удаление) → скилл `uploads`. **Колонка с ключом файла — строка в `KEY_COLUMNS`** (`crud/public/stored_file.py`), иначе ночная чистка удалит её файлы.
 
 ## 3. Структура и слои
 
@@ -46,7 +47,7 @@ app/
 ├── crud/{public,admin}/                   # доступ к БД; _base.py — общий CRUD
 ├── domain/<субдомен>/                     # бизнес-логика, общая для public и admin
 ├── models/                                # SQLAlchemy, одни на обе стороны
-└── core/                                  # config, db, csrf, auth/, admin/, logs/, middleware/, docs/
+└── core/                                  # config, db, csrf, auth/, admin/, logs/, middleware/, docs/, s3/ (загрузки)
 static/ (css, js, img), tailwind/input.css, docker/postgres/, alembic/, tests/, scripts/, docs/
 ```
 

@@ -5,6 +5,7 @@ from itsdangerous import BadData, URLSafeTimedSerializer
 
 from app.core.config import APP_DIR, settings
 from app.core.csrf import CSRF_SALT
+from app.domain.uploads.urls import thumbnail_key
 from app.web.toast_params import TOAST_KIND_PARAM, TOAST_PARAM
 
 templates = Jinja2Templates(directory=str(APP_DIR / 'templates'))
@@ -52,6 +53,9 @@ def _canonical_for(request: Request, path: str) -> str:
 
 templates.env.filters['ru_plural'] = _ru_plural
 templates.env.filters['full_name'] = _full_name
+# Ссылка на превью есть в file_urls рядом со ссылкой на оригинал: фильтр
+# только выбирает ключ, `file_urls[key | thumbnail]`.
+templates.env.filters['thumbnail'] = thumbnail_key
 templates.env.globals['static_version'] = _static_version  # ty: ignore[invalid-assignment]
 templates.env.globals['canonical_for'] = _canonical_for  # ty: ignore[invalid-assignment]
 templates.env.globals['site_name'] = settings.site.NAME  # ty: ignore[invalid-assignment]

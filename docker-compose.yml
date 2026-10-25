@@ -59,6 +59,45 @@ services:
     env_file:
       - .env.docker
 
+  uploads_backup:
+    # Ежедневная копия бакета загрузок в бакет другого провайдера,
+    # docs/guide/ops/uploads-backups.md. Источник читается тем же ключом,
+    # что и у сайта: переменные S3__* подставляются сюда из --env-file.
+    image: ${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME}-uploads-backup:latest
+    container_name: uploads_backup
+    logging: *default-logging
+    restart: always
+    init: true
+    command: ["uploads-backup-scheduler"]
+    environment:
+      RCLONE_CONFIG_SRC_TYPE: s3
+      RCLONE_CONFIG_SRC_PROVIDER: Other
+      RCLONE_CONFIG_SRC_ENDPOINT: ${S3__URL}
+      RCLONE_CONFIG_SRC_REGION: ${S3__REGION}
+      RCLONE_CONFIG_SRC_ACCESS_KEY_ID: ${S3__ACCESS_KEY}
+      RCLONE_CONFIG_SRC_SECRET_ACCESS_KEY: ${S3__SECRET_KEY}
+      UPLOADS_BACKUP_SOURCE_BUCKET: ${S3__BUCKET_NAME}
+      RCLONE_CONFIG_DST_TYPE: s3
+      RCLONE_CONFIG_DST_PROVIDER: Other
+    env_file:
+      - .env.docker
+
+  uploads_sweep:
+    # Ночная чистка осиротевших файлов бакета (scripts/uploads/sweep_scheduler.py).
+    # Отдельный сервис: инстансов web может быть несколько, а чистка — одна.
+    image: ${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME}:latest
+    container_name: uploads_sweep
+    logging: *default-logging
+    restart: always
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    entrypoint: ["python", "-m", "scripts.uploads.sweep_scheduler"]
+    networks:
+      - app_network
+    env_file:
+      - .env.docker
+
   migrate:
     image: ${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME}:latest
     container_name: fastapi_migrate

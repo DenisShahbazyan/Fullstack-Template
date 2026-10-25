@@ -1,0 +1,94 @@
+#!/bin/sh
+# Копия бакета загрузок в бакет другого провайдера, процесс сервиса
+# uploads_backup в docker-compose.yml. Раз в сутки (UTC) зеркалит загрузки в
+# current/. Файлы, пропавшие или изменённые в источнике, не теряются, а уходят
+# в archive/<дата>/ и лежат там RETENTION_DAYS суток. Отметку «сегодня уже
+# было» берёт из самой копии, поэтому перезапуск при деплое копию не повторяет.
+
+set -u
+
+SRC="src:${UPLOADS_BACKUP_SOURCE_BUCKET:-}"
+DST="dst:${UPLOADS_BACKUP_BUCKET:-}"
+MIRROR="$DST/current"
+ARCHIVE="$DST/archive"
+STATE="$DST/state/last-success"
+
+RETENTION_DAYS=30
+RETRY_SECONDS=3600
+# Временные загрузки (S3__TMP_PATH) не принятые записью, удаляет uploads_sweep:
+# в копии они не нужны.
+EXCLUDE="tmp/**"
+# Файл, загруженный за минуты до проверки, мог не попасть в синхронизацию.
+CHECK_MIN_AGE=10m
+
+notify() {
+    [ -n "${UPLOADS_BACKUP_PING_URL:-}" ] || return 0
+    curl -fsS -m 10 --retry 3 -o /dev/null "${UPLOADS_BACKUP_PING_URL}$1" || true
+}
+
+last_success_day() {
+    rclone cat "$STATE" 2>/dev/null | head -n 1
+}
+
+source_has_objects() {
+    rclone lsf --max-depth 1 "$SRC" | grep -q .
+}
+
+mirror_uploads() {
+    rclone sync "$SRC" "$MIRROR" --exclude "$EXCLUDE" \
+        --backup-dir "$ARCHIVE/$(date -u +%F)" \
+        --transfers 8 --checkers 16 --stats-one-line -v
+}
+
+verify_mirror() {
+    rclone check "$SRC" "$MIRROR" --exclude "$EXCLUDE" \
+        --one-way --size-only --min-age "$CHECK_MIN_AGE"
+}
+
+purge_expired_archive() {
+    cutoff=$(date -u -d "@$(( $(date +%s) - RETENTION_DAYS * 86400 ))" +%F | sed 's/-//g')
+    days=$(rclone lsf --dirs-only "$ARCHIVE")
+    status=$?
+    # 3 — архива ещё нет: в источнике пока ничего не удаляли и не меняли.
+    [ "$status" -eq 0 ] || [ "$status" -eq 3 ] || return 1
+    for day in $days; do
+        day=${day%/}
+        case "$day" in
+            [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+            *) continue ;;
+        esac
+        if [ "$(echo "$day" | sed 's/-//g')" -lt "$cutoff" ]; then
+            rclone purge "$ARCHIVE/$day" || return 1
+        fi
+    done
+}
+
+mark_success() {
+    date -u +%F | rclone rcat "$STATE"
+}
+
+run_backup() {
+    if ! source_has_objects; then
+        echo "Бакет загрузок пуст или недоступен, копирование отменено."
+        notify /fail
+        return 1
+    fi
+    if mirror_uploads && verify_mirror && purge_expired_archive && mark_success; then
+        notify ""
+    else
+        notify /fail
+        return 1
+    fi
+}
+
+if [ -z "${UPLOADS_BACKUP_BUCKET:-}" ]; then
+    echo "Раздел UPLOADS BACKUP в .env.docker не заполнен, копия загрузок выключена."
+    while :; do sleep 3600; done
+fi
+
+while :; do
+    if [ "$(last_success_day)" != "$(date -u +%F)" ] && ! run_backup; then
+        sleep "$RETRY_SECONDS"
+    fi
+    sleep 60
+done

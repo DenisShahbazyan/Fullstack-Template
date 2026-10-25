@@ -9,10 +9,11 @@
 - **Пользователи:** регистрация и вход по email (fastapi-users), JWT в HttpOnly-cookie для сайта и Bearer для API, скользящая сессия, роли `USER` / `MODER` / `ADMIN`.
 - **Сайт:** главная, вход, регистрация, страница ошибок, тосты, CSRF на всех формах.
 - **Админка** `/admin`: панель, пользователи со сменой роли, журнал аудита. То же в API: `/api/admin/v1/...`.
+- **Загрузки:** приватный бакет S3 со своими ключами, фото в WebP с превью, подписанные ссылки, временные загрузки для API, ночная чистка сирот, ежедневная копия бакета к другому провайдеру ([ADR 0002](docs/DECISIONS/0002-s3-uploads.md)).
 - **Инфраструктура:** базовый CRUD с тестами, доменные ошибки → HTTP-коды, JSON-логи с request id, Swagger на `/docs`, `/health`.
 - **Прод:** Docker-образ, granian за Caddy (TLS и лимиты запросов), CI/CD через Docker Hub, Postgres + pgBackRest (WAL и ежедневный бэкап в S3, еженедельная проверка восстановления).
 
-Сознательно **нет** Redis, очереди задач, поиска и загрузок в S3 — добавляются, когда понадобятся (правила для них уже в CLAUDE.md).
+Сознательно **нет** Redis, очереди задач и поиска — добавляются, когда понадобятся (правила для них уже в CLAUDE.md).
 
 ## Новый проект из шаблона
 
@@ -38,8 +39,8 @@
 
    После правки `pyproject.toml` — `uv lock`.
 
-3. Заполнить `.env.docker`: `DOCKER_USERNAME`, `DOMAIN`, все `change-me` (пароли и секреты — `openssl rand -base64 48`), `POSTGRES_USER`/`POSTGRES_PASSWORD` совпадают с `DB__USERNAME`/`DB__PASSWORD`. Раздел `BACKUPS` — по [docs/guide/ops/backups.md](docs/guide/ops/backups.md). Файл коммитится вместе с секретами — **репозиторий должен быть приватным**.
-4. В `.env.local` сгенерировать свои `JWT__SECRET` и `CSRF__SECRET` (`openssl rand -hex 32`).
+3. Заполнить `.env.docker`: `DOCKER_USERNAME`, `DOMAIN`, все `change-me` (пароли и секреты — `openssl rand -base64 48`), `POSTGRES_USER`/`POSTGRES_PASSWORD` совпадают с `DB__USERNAME`/`DB__PASSWORD`. Раздел `BACKUPS` — по [docs/guide/ops/backups.md](docs/guide/ops/backups.md), `UPLOADS BACKUP` — по [uploads-backups.md](docs/guide/ops/uploads-backups.md). `S3__*` — **свой бакет проекта** и ключ только к нему. Файл коммитится вместе с секретами — **репозиторий должен быть приватным**.
+4. В `.env.local` сгенерировать свои `JWT__SECRET` и `CSRF__SECRET` (`openssl rand -hex 32`) и вписать `S3__*` — отдельный dev-бакет проекта, не продовый и не от другого проекта.
 5. Заполнить §0 и §2 (предметная часть) в `CLAUDE.md`, `docs/spec/v01.md`, `docs/plan/mvp.md`.
 6. Палитру сайта — токены `@theme` в `tailwind/input.css`.
 7. Первая миграция `alembic/versions/…_first_migration.py` уже есть. Новые модели — `make revision m="..."`.
@@ -109,6 +110,7 @@ sudo docker logs postgres_backup     # бэкапы: в конце «Восст�
 app/            приложение (слои — CLAUDE.md §3)
 alembic/        миграции
 docker/postgres/ образ Postgres + pgBackRest и скрипты бэкапа
+docker/uploads-backup/ образ rclone и расписание копии бакета загрузок
 docs/           спека, план, ADR, эксплуатация
 scripts/        start.sh, migrate.sh, консольные утилиты
 static/         css (собранный), js (htmx, alpine), swagger

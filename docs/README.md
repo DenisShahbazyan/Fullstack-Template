@@ -12,6 +12,7 @@ _TODO: одним абзацем — что за продукт и для ког
 | [TODO.md](TODO.md) | Отложенные задачи |
 | [DECISIONS/](DECISIONS/) | ADR — архитектурные решения и их причины |
 | [guide/ops/backups.md](guide/ops/backups.md) | Бэкапы Postgres: включение, проверка, восстановление |
+| [guide/ops/uploads-backups.md](guide/ops/uploads-backups.md) | Копия бакета загрузок: включение, восстановление |
 | [guide/ops/dbeaver-prod.md](guide/ops/dbeaver-prod.md) | Подключение к продовой БД через SSH-туннель |
 
 ## С чего начать

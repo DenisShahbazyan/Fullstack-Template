@@ -71,6 +71,32 @@ class Site(BaseModel):
     NAME: str = 'MyProject'
 
 
+class S3(BaseModel):
+    """Хранилище файлов. У каждого проекта свой бакет — и в проде, и локально."""
+
+    URL: str = 'https://s3.twcstorage.ru'
+    REGION: str = 'ru-1'
+    ACCESS_KEY: str = ''
+    SECRET_KEY: str = ''
+    BUCKET_NAME: str = ''
+
+    TMP_PATH: str = 'tmp'
+    MAX_UPLOAD_BYTES: int = 20 * 1024 * 1024
+    IMAGE_MAX_SIDE: int = 2048
+    # Превью для карточек и плиток: карточка на телефоне во всю ширину,
+    # около 400px, — с запасом на плотность экрана 2x.
+    THUMBNAIL_SIDE: int = 800
+    WEBP_QUALITY: int = 85
+    # Бакет приватный: ссылки подписываются и живут ограниченное время.
+    # Запас нужен, чтобы открытая страница не протухла на глазах у пользователя.
+    PRESIGNED_TTL_SECONDS: int = 3600
+
+    # Файл без ссылок из базы удаляется не раньше, чем через столько часов:
+    # столько живёт и временная загрузка, не принятая записью.
+    ORPHAN_TTL_HOURS: int = 24
+    SWEEP_BATCH_SIZE: int = 100
+
+
 def get_env_file(environment: str | None) -> Path:
     match environment:
         case 'docker':
@@ -98,6 +124,7 @@ class Settings(BaseSettings):
     csrf: Csrf = Csrf()
     static: Static = Static()
     site: Site = Site()
+    s3: S3 = S3()
 
 
 settings = Settings()
