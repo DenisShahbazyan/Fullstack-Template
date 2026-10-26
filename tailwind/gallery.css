@@ -38,6 +38,7 @@
         font-size: 0.75rem;
         color: var(--color-ink-muted);
     }
+    .gallery-cell:has(> .gallery-file-name) { box-shadow: inset 0 0 0 1px var(--color-line); }
     .gallery-empty { grid-column: 1 / -1; padding: 2rem 1rem; text-align: center; font-size: 0.875rem; color: var(--color-ink-muted); }
     .gallery-grid:has([data-upload-queue] > *) .gallery-empty { display: none; }
     .gallery-badge {
