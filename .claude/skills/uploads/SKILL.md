@@ -58,7 +58,7 @@ description: Загрузка, показ и удаление файлов в S3
 | `POST …/images/{id}/cover` | — | partial галереи, **порядок плиток прежний** |
 | `POST …/images/{id}/delete` | — | partial галереи |
 
-Роуты — в `actions_router` с `csrf_validate` (токен шлёт заголовком и сам загрузчик). Ошибка — доменное исключение: `web/errors.py` отдаст её тостом, загрузчик покажет текст на плитке. Плитка — `gallery_ui.tile(id, file_urls[key | thumbnail], is_cover=...)` с `cover_form` и `delete_form` внутри.
+Удаление спрашивает подтверждения окном `confirm_dialog` из `templates/public/macros/modal.html` — макрос каркаса, он должен быть в проекте. Роуты — в `actions_router` с `csrf_validate` (токен шлёт заголовком и сам загрузчик). Ошибка — доменное исключение: `web/errors.py` отдаст её тостом, загрузчик покажет текст на плитке. Плитка — `gallery_ui.tile(id, file_urls[key | thumbnail], is_cover=...)` с `cover_form` и `delete_form` внутри.
 
 **Записи ещё нет (черновик)** — обёртка с `data-gallery-draft`, файл — в `tmp/` автора (`store_tmp_upload`), ответ — `gallery_ui.draft_tile(key, url, 'image_keys')`, вставка `beforeend` в контейнер плиток с пустым `data-drag-sort`. Порядок — порядок полей `image_keys`, обложка — `gallery_ui.draft_cover_input('cover_key')`; без выбора обложка — первое фото. Сохранение формы — `claim_uploads(user.id, keys, FOLDER)`. Ошибка ввода в остальной форме — перерисовать черновик из присланных ключей, отфильтровав чужие (`tmp_owner`).
 

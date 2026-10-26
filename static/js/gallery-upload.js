@@ -224,6 +224,8 @@
         cancel.textContent = '✕';
         tile.append(preview.media, overlay, cancel);
         c.list.appendChild(tile);
+        // В ленте, которая листается вбок, новая плитка уходит за край.
+        tile.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 
         let finished = false;
         const remove = () => {

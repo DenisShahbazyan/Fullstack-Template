@@ -46,9 +46,10 @@ data-upload-swap="{{ swap }}" data-accept="{{ accept }}" data-max-size="{{ max_s
 <div class="contents" data-upload-queue></div>
 {%- endmacro %}
 
-{#- Плитка файла. `open` — выражение Alpine, открывающее просмотр; caller —
-    кнопки действий поверх плитки (cover_form, delete_form). -#}
-{% macro tile(drag_id, src, is_cover=false, open=none, label='', is_video=false) -%}
+{#- Плитка файла. `open` — выражение Alpine, открывающее просмотр; `note` —
+    отметка, видная всегда (например, «на проверке»); caller — кнопки
+    действий поверх плитки (cover_form, delete_form). -#}
+{% macro tile(drag_id, src, is_cover=false, open=none, label='', is_video=false, note='') -%}
 <div class="gallery-cell{% if is_cover %} is-cover{% endif %}" data-drag-id="{{ drag_id }}">
     {% if open %}<button type="button" class="gallery-thumb" @click="{{ open }}" aria-label="{{ label }}">{% endif %}
     <img class="gallery-img" src="{{ src }}" alt="" loading="lazy" draggable="false" data-drag-ghost>
@@ -59,6 +60,7 @@ data-upload-swap="{{ swap }}" data-accept="{{ accept }}" data-max-size="{{ max_s
     {% endif %}
     {% if open %}</button>{% endif %}
     <span class="gallery-badge gallery-cover-badge">★ Обложка</span>
+    {% if note %}<div class="gallery-note">{{ note }}</div>{% endif %}
     <div class="gallery-actions" data-drag-skip>{{ caller() if caller else '' }}</div>
 </div>
 {%- endmacro %}
