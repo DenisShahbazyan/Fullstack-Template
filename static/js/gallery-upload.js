@@ -29,10 +29,14 @@
     const PHOTO_KEEP_BYTES = 2 * 1024 ** 2;
     // GIF не трогаем: canvas оставил бы от анимации первый кадр.
     const SHRINKABLE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+    // HEIC с iPhone сервер не принимает, а Safari его читает: такое фото
+    // перекодируется здесь в любом случае. Браузер, который HEIC не читает,
+    // покажет на плитке, что формат не подходит.
+    const HEIC_TYPES = ['image/heic', 'image/heif'];
     // Браузер не всегда знает тип файла — тогда берём его по расширению.
     const EXTENSION_TYPES = {
         jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
-        gif: 'image/gif', pdf: 'application/pdf',
+        gif: 'image/gif', pdf: 'application/pdf', heic: 'image/heic', heif: 'image/heif',
         mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime',
     };
     const FAILED = 'Не удалось загрузить файл';
@@ -73,7 +77,8 @@
     function problemWith(c, file, type, uploader) {
         if (file.size === 0) return 'Файл пустой';
         if (uploader) return uploader.problem?.(file, type, c.root) ?? null;
-        if (!c.types.includes(type)) return 'Такой формат не подходит';
+        const isConvertible = HEIC_TYPES.includes(type) && c.types.includes('image/jpeg');
+        if (!c.types.includes(type) && !isConvertible) return 'Такой формат не подходит';
         if (file.size > c.maxSize) return `Файл больше ${formatSize(c.maxSize)}`;
         return null;
     }
@@ -104,17 +109,20 @@
     // Что не вышло ужать (браузер не прочитал формат), уходит как есть:
     // сервер разберёт файл по содержимому и сам скажет, если он не подходит.
     async function shrunk(file, type) {
-        if (!SHRINKABLE_TYPES.includes(type)) return file;
+        const isHeic = HEIC_TYPES.includes(type);
+        if (!isHeic && !SHRINKABLE_TYPES.includes(type)) return file;
         let bitmap;
         try {
             bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
         } catch {
+            if (isHeic) throw new Error('Такой формат не подходит — сохраните фото как JPEG');
             return file;
         }
         try {
             const isLarge = Math.max(bitmap.width, bitmap.height) > PHOTO_MAX_SIDE;
-            if (!isLarge && file.size <= PHOTO_KEEP_BYTES) return file;
+            if (!isHeic && !isLarge && file.size <= PHOTO_KEEP_BYTES) return file;
             const blob = await encode(scaled(bitmap, PHOTO_MAX_SIDE), type, PHOTO_QUALITY);
+            if (isHeic) return blob ?? file;
             return blob && blob.size < file.size ? blob : file;
         } finally {
             bitmap.close();

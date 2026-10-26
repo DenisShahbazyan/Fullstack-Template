@@ -56,6 +56,9 @@
        обложка встанет после обновления страницы. */
     .gallery-cell:not(.is-cover) .gallery-cover-badge,
     .gallery-cell.is-cover .gallery-make-cover { display: none; }
+    /* Галерея, где обложки сейчас нет (например, пачка отдельных работ). */
+    .is-no-cover .gallery-cover-badge,
+    .is-no-cover .gallery-make-cover { display: none; }
 
     /* Управление плиткой проявляется на наведении. Где наведения нет —
        на телефоне, — оно видно всегда, иначе файл было бы нечем удалить. */

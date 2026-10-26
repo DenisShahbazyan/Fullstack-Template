@@ -33,8 +33,10 @@ data-gallery-upload data-upload-url="{{ url }}" data-upload-target="{{ target }}
 data-upload-swap="{{ swap }}" data-accept="{{ accept }}" data-max-size="{{ max_size }}"
 {%- endmacro %}
 
-{#- `accept` браузера шире списка MIME: .mov он не всегда узнаёт по типу. -#}
+{#- `accept` браузера шире списка MIME: .mov он не всегда узнаёт по типу, а
+    HEIC с iPhone загрузчик перекодирует сам — его выбор не запрещаем. -#}
 {% macro pick_button(accept, label='+ Добавить', class='btn btn-primary btn-sm', multiple=true) -%}
+{%- set accept = accept ~ ',image/heic,image/heif' if 'image/jpeg' in accept else accept -%}
 <label class="{{ class }} shrink-0 cursor-pointer">
     {{ label }}
     <input type="file" class="sr-only" accept="{{ accept }}"{% if multiple %} multiple{% endif %}>
