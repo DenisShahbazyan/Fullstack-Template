@@ -5,6 +5,7 @@ from itsdangerous import BadData, URLSafeTimedSerializer
 
 from app.core.config import APP_DIR, settings
 from app.core.csrf import CSRF_SALT
+from app.domain.uploads.types import IMAGE_TYPES
 from app.domain.uploads.urls import thumbnail_key
 from app.web.toast_params import TOAST_KIND_PARAM, TOAST_PARAM
 
@@ -59,6 +60,9 @@ templates.env.filters['thumbnail'] = thumbnail_key
 templates.env.globals['static_version'] = _static_version  # ty: ignore[invalid-assignment]
 templates.env.globals['canonical_for'] = _canonical_for  # ty: ignore[invalid-assignment]
 templates.env.globals['site_name'] = settings.site.NAME  # ty: ignore[invalid-assignment]
+# Загрузчик галереи проверяет тип и вес до отправки, а не после.
+templates.env.globals['upload_image_types'] = ','.join(sorted(IMAGE_TYPES))  # ty: ignore[invalid-assignment]
+templates.env.globals['upload_max_bytes'] = settings.s3.MAX_UPLOAD_BYTES  # ty: ignore[invalid-assignment]
 
 
 def _reuse_csrf_token(request: Request, csrf: CsrfProtect) -> tuple[str, str] | None:
