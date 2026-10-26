@@ -13,8 +13,10 @@ from app.domain.uploads.orphans import (
     StoredFile,
     ensure_sweep_plausible,
     find_orphans,
+    sweep_prefixes,
 )
-from app.domain.uploads.project import SITE_FOLDERS
+from app.models._base import Base
+from app.models.file_keys import key_folders
 
 logger = logging.getLogger(__name__)
 
@@ -28,14 +30,16 @@ class SweepPlan:
 async def plan_orphan_sweep() -> SweepPlan:
     """Сироты среди файлов сайта, записанных раньше, чем ORPHAN_TTL_HOURS назад.
 
-    Ссылки читаются до листинга: файл, загруженный после чтения базы, свежий,
-    и чистка его не тронет.
+    Папки сайта — папки колонок с пометкой `file_folder`. Ссылки читаются до
+    листинга: файл, загруженный после чтения базы, свежий, и чистка его не
+    тронет.
     """
     async with AsyncSessionLocal() as session:
         referenced = await get_referenced_keys(session)
+    folders = {*key_folders(Base.registry), settings.s3.TMP_PATH}
     files: list[StoredFile] = []
-    for folder in (*SITE_FOLDERS, settings.s3.TMP_PATH):
-        files += await s3_client.list_files(f'{folder}/')
+    for prefix in sweep_prefixes(folders):
+        files += await s3_client.list_files(prefix)
     written_before = datetime.now(UTC) - timedelta(hours=settings.s3.ORPHAN_TTL_HOURS)
     return SweepPlan(len(files), find_orphans(files, referenced, written_before))
 

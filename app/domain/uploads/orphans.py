@@ -20,6 +20,20 @@ class StoredFile:
     modified_at: datetime
 
 
+def sweep_prefixes(folders: Iterable[str]) -> list[str]:
+    """Префиксы, которые обходит чистка: вложенная папка — внутри родительской.
+
+    Отдельный обход `avatars/source` рядом с `avatars` выдал бы её файлы
+    дважды — в том числе в счёт для `ensure_sweep_plausible`.
+    """
+    unique = set(folders)
+    return sorted(
+        f'{folder}/'
+        for folder in unique
+        if not any(folder.startswith(f'{other}/') for other in unique)
+    )
+
+
 def find_orphans(
     files: Iterable[StoredFile],
     referenced: Collection[str],

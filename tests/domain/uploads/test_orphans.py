@@ -8,6 +8,7 @@ from app.domain.uploads.orphans import (
     StoredFile,
     ensure_sweep_plausible,
     find_orphans,
+    sweep_prefixes,
 )
 
 NOW = datetime(2026, 10, 25, 12, tzinfo=UTC)
@@ -63,3 +64,12 @@ def test_sweep_of_half_the_files_is_allowed():
 
 def test_small_bucket_is_not_guarded():
     ensure_sweep_plausible(MIN_GUARDED_TOTAL - 1, MIN_GUARDED_TOTAL - 1)
+
+
+def test_nested_folder_is_swept_with_its_parent():
+    folders = {'avatars', 'avatars/source', 'tmp'}
+    assert sweep_prefixes(folders) == ['avatars/', 'tmp/']
+
+
+def test_folder_sharing_a_name_prefix_is_swept_separately():
+    assert sweep_prefixes({'avatars', 'avatars-old'}) == ['avatars-old/', 'avatars/']

@@ -1,8 +1,9 @@
 """Ключи файлов хранилища, на которые ссылается база.
 
-Проектный файл: у каждого проекта свои колонки. Новая колонка с ключом
-файла — строка в `KEY_COLUMNS` (JSONB с ключами внутри — в `JSON_KEY_COLUMNS`).
-Иначе чистка сирот сочтёт её файлы ненужными и удалит.
+Колонки находятся по пометке `file_folder` / `file_keys_in_json`
+(`app/models/file_keys.py`). Импорт `Base` загружает пакет `app.models`, а его
+`__init__` — все модели: колонка модели, которой там нет, осталась бы без
+защиты от чистки.
 """
 
 from collections.abc import Iterator
@@ -10,10 +11,9 @@ from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import InstrumentedAttribute
 
-KEY_COLUMNS: tuple[InstrumentedAttribute[Any], ...] = ()
-JSON_KEY_COLUMNS: tuple[InstrumentedAttribute[Any], ...] = ()
+from app.models._base import Base
+from app.models.file_keys import json_key_columns, key_columns
 
 
 async def get_referenced_keys(async_session: AsyncSession) -> set[str]:
@@ -27,11 +27,11 @@ async def get_referenced_keys(async_session: AsyncSession) -> set[str]:
         execution_options={'isolation_level': 'REPEATABLE READ'}
     )
     keys: set[str] = set()
-    for column in KEY_COLUMNS:
+    for column in key_columns(Base.registry):
         keys.update(
             await async_session.scalars(select(column).where(column.is_not(None)))
         )
-    for column in JSON_KEY_COLUMNS:
+    for column in json_key_columns(Base.registry):
         for value in await async_session.scalars(select(column)):
             keys.update(_strings_in(value))
     return keys
@@ -42,7 +42,7 @@ async def get_rows_with_key_prefix(
 ) -> list[tuple[Any, str]]:
     """Строки, где ключ файла начинается с `prefix`: пары (строка, имя колонки)."""
     rows: list[tuple[Any, str]] = []
-    for column in KEY_COLUMNS:
+    for column in key_columns(Base.registry):
         query = select(column.class_).where(column.startswith(prefix))
         rows += [(row, column.key) for row in await async_session.scalars(query)]
     return rows
