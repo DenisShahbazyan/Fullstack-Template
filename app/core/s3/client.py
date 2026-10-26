@@ -5,9 +5,10 @@
 коду botocore знать незачем.
 """
 
+import asyncio
 import base64
 import hashlib
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator, Generator, Sequence
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from functools import cached_property
@@ -29,6 +30,9 @@ _CONFIG = Config(
     s3={'addressing_style': 'path'},
     retries={'max_attempts': 3, 'mode': 'standard'},
 )
+# Копий разом на одном клиенте: хватает, чтобы галерея принималась за время
+# одной-двух копий, и не упирается в пул соединений botocore (10 по умолчанию).
+_PARALLEL_COPIES = 8
 # «Того, что просили, нет» — объекта, загрузки частями или конфига бакета.
 # NoSuchBucket сюда не входит: это ошибка настройки, а не пропавший файл.
 _MISSING_CODES = frozenset(
@@ -104,13 +108,35 @@ class S3Client:
             async with response['Body'] as stream:
                 return await stream.read()
 
-    async def copy(self, source: str, target: str) -> None:
+    async def copy_many(self, pairs: Sequence[tuple[str, str]]) -> None:
+        """Копирует объекты (откуда, куда) на одном клиенте, по нескольку разом.
+
+        Копия — доли секунды, и почти всё это время — дорога до хранилища. По
+        очереди и с новым соединением на каждую галерея из десяти фото с
+        превью принималась бы секунды. Ошибка любой копии — ошибка вызова,
+        но только после того, как остальные закончат: клиент закрывается
+        последним.
+        """
+        if not pairs:
+            return
+        limit = asyncio.Semaphore(_PARALLEL_COPIES)
         async with self.raw() as client:
-            await client.copy_object(
-                Bucket=self.bucket,
-                CopySource={'Bucket': self.bucket, 'Key': source},
-                Key=target,
+
+            async def copy(source: str, target: str) -> None:
+                async with limit:
+                    await client.copy_object(
+                        Bucket=self.bucket,
+                        CopySource={'Bucket': self.bucket, 'Key': source},
+                        Key=target,
+                    )
+
+            results = await asyncio.gather(
+                *(copy(source, target) for source, target in pairs),
+                return_exceptions=True,
             )
+            for result in results:
+                if isinstance(result, BaseException):
+                    raise result
 
     async def delete_many(self, keys: list[str]) -> DeleteResult:
         """Удаляет до 1000 объектов за запрос."""

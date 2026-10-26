@@ -55,7 +55,8 @@ async def claim_uploads(
     fresh = [key for key in dict.fromkeys(keys) if key not in kept]
     if any(tmp_owner(key, settings.s3.TMP_PATH) != user_id for key in fresh):
         raise ForeignUploadError()
-    moved = {key: await copy_to_folder(key, folder) for key in fresh}
+    moved = {key: _new_key_in(folder, key) for key in fresh}
+    await s3_client.copy_many(_with_thumbnails(moved))
     return [moved.get(key, key) for key in keys]
 
 
@@ -66,8 +67,20 @@ async def copy_to_folder(key: str, folder: str) -> str:
         StoredFileMissingError: исходного файла нет.
         FileStorageUnavailableError: хранилище не скопировало файл.
     """
-    target = new_key(folder, extension_of(key), str(uuid.uuid4()))
-    await s3_client.copy(key, target)
-    if thumbnail_key(key) != key:
-        await s3_client.copy(thumbnail_key(key), thumbnail_key(target))
+    target = _new_key_in(folder, key)
+    await s3_client.copy_many(_with_thumbnails({key: target}))
     return target
+
+
+def _new_key_in(folder: str, key: str) -> str:
+    return new_key(folder, extension_of(key), str(uuid.uuid4()))
+
+
+def _with_thumbnails(moved: dict[str, str]) -> list[tuple[str, str]]:
+    """Пары (откуда, куда) вместе с превью — у документа его нет."""
+    pairs: list[tuple[str, str]] = []
+    for source, target in moved.items():
+        pairs.append((source, target))
+        if thumbnail_key(source) != source:
+            pairs.append((thumbnail_key(source), thumbnail_key(target)))
+    return pairs
