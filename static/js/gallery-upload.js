@@ -287,6 +287,14 @@
         }
     }
 
+    // data-uploading на обёртке, пока её файлы не дошли: форма черновика
+    // по нему не уходит раньше времени (gallery-draft.js).
+    function track(root, delta) {
+        const count = Number(root.dataset.uploading || 0) + delta;
+        if (count > 0) root.dataset.uploading = count;
+        else delete root.dataset.uploading;
+    }
+
     function enqueue(root, files) {
         const c = config(root);
         Array.from(files).forEach((file) => {
@@ -295,9 +303,13 @@
             const controller = new AbortController();
             tile.onCancel(() => controller.abort());
             pending++;
+            track(root, 1);
             queue = queue
                 .then(() => upload(c, file, type, tile, controller))
-                .finally(() => { pending--; });
+                .finally(() => {
+                    pending--;
+                    track(root, -1);
+                });
         });
     }
 

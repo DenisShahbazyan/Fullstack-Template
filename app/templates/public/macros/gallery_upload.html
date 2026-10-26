@@ -82,11 +82,15 @@ data-upload-swap="{{ swap }}" data-accept="{{ accept }}" data-max-size="{{ max_s
 
 {#- Плитка черновика: ключ временной загрузки уходит с формой полем `field`
     по порядку плиток. Убрать — только из формы: файл во временной папке
-    уберёт ночная чистка. -#}
-{% macro draft_tile(key, src, field, with_cover=true) -%}
+    уберёт ночная чистка. Без `src` (документ без превью) на плитке `name`. -#}
+{% macro draft_tile(key, src, field, with_cover=true, name='') -%}
 <div class="gallery-cell" data-drag-id="{{ key }}" data-draft-key="{{ key }}">
     <input type="hidden" name="{{ field }}" value="{{ key }}">
+    {% if src %}
     <img class="gallery-img" src="{{ src }}" alt="" draggable="false" data-drag-ghost>
+    {% else %}
+    <span class="gallery-file-name" data-drag-ghost>{{ name }}</span>
+    {% endif %}
     <span class="gallery-badge gallery-cover-badge">★ Обложка</span>
     <div class="gallery-actions" data-drag-skip>
         {% if with_cover %}

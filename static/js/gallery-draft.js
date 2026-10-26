@@ -32,6 +32,15 @@
         if (draft) sync(draft);
     });
 
+    // Форма с недогруженными файлами не уходит: их ключей в ней ещё нет, и
+    // запись сохранилась бы без них. Перехват — раньше обработчика htmx.
+    document.addEventListener('submit', (event) => {
+        if (!event.target.querySelector?.('[data-gallery-draft][data-uploading]')) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        window.toast?.('Дождитесь, пока загрузятся файлы');
+    }, true);
+
     htmx.onLoad((element) => {
         const drafts = element.matches?.('[data-gallery-draft]') ? [element] : [];
         drafts.push(...(element.querySelectorAll?.('[data-gallery-draft]') ?? []));
