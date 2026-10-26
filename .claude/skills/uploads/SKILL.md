@@ -1,11 +1,11 @@
 ---
 name: uploads
-description: Загрузка, показ и удаление файлов в S3 — store_upload/store_image, превью _thumb.webp, подписанные ссылки signed_urls_by_key, временные загрузки и claim_uploads, discard_files, чистка сирот (пометка колонок file_folder), копия бакета; особенности проекта — project.md рядом. Использовать при любом новом поле с файлом, папке бакета, форме или эндпоинте с загрузкой, показе или удалении фото, переезде ключей, правке core/s3 или domain/uploads.
+description: Загрузка, показ и удаление файлов в S3 — store_upload/store_image, превью _thumb.webp, подписанные ссылки signed_urls_by_key, временные загрузки и claim_uploads, discard_files, чистка сирот (пометка колонок file_folder), копия бакета, галерея в браузере (плитки с прогрессом, обложка, порядок перетаскиванием); особенности проекта — project.md рядом. Использовать при любом новом поле с файлом, папке бакета, форме или эндпоинте с загрузкой, галерее фото, показе или удалении фото, переезде ключей, правке core/s3 или domain/uploads.
 ---
 
 # Загрузки в S3
 
-Этот файл и модули `core/s3/`, `core/images.py`, `domain/uploads/` (кроме `project.py`), `scripts/uploads/`, `docker/uploads-backup/`, `tests/domain/uploads/` **одинаковы во всех проектах на каркасе**. Своё у проекта — `domain/uploads/project.py`, пометки `file_folder` на колонках моделей и **[project.md](project.md)** рядом: ADR проекта, его папки и загрузки сверх общих. Прочитать оба файла.
+Этот файл и модули `core/s3/`, `core/images.py`, `domain/uploads/` (кроме `project.py`), `scripts/uploads/`, `docker/uploads-backup/`, `tests/domain/uploads/`, а также галерея — `static/js/gallery-upload.js`, `gallery-draft.js`, `drag-sort.js`, `tailwind/gallery.css`, `templates/public/macros/gallery_upload.html` — **одинаковы во всех проектах на каркасе**. Своё у проекта — `domain/uploads/project.py`, пометки `file_folder` на колонках моделей и **[project.md](project.md)** рядом: ADR проекта, его папки и загрузки сверх общих. Прочитать оба файла.
 
 ## Как устроено
 
@@ -33,6 +33,7 @@ description: Загрузка, показ и удаление файлов в S3
 | Пометка колонок с ключами | `models/file_keys.py`: `file_folder`, `file_keys_in_json`, `folder_of` |
 | Ключи, на которые ссылается база | `crud/public/stored_file.py` |
 | Настройки | `class S3` в `core/config.py`, ключи `S3__*` |
+| Галерея в браузере | макросы `templates/public/macros/gallery_upload.html`, `static/js/gallery-*.js`, `drag-sort.js`, `tailwind/gallery.css` (ADR проекта — в project.md) |
 
 ## Новое поле с файлом — чек-лист
 
@@ -43,6 +44,25 @@ description: Загрузка, показ и удаление файлов в S3
 5. **Замена или удаление** — `discard_files(*old_keys)` **после** commit; превью уходит само, ошибку хранилища функция только пишет в лог. Пока старый файл ещё кто-то видит, не удалять.
 6. **Показ** — в роуте один вызов на страницу: `file_urls = await signed_urls_by_key(keys)`, не по ключу в цикле. В шаблоне `file_urls[key | thumbnail]` — сетки и карточки, `file_urls[key]` — на весь экран. PDF (`is_pdf`) — ссылкой, не `<img>`.
 7. **Ошибки** — подклассы общих в `domain/errors.py`: `ValidationError` → 422 (формат, размер, чужой ключ), `UpstreamError` → 502 (`FileStorageUnavailableError`). Новая ошибка загрузок — в `domain/uploads/errors.py`, проектная — в `errors.py` субдомена.
+
+## Галерея в браузере
+
+Любая форма с фото — общий компонент, не свой JS. У каждого файла своя плитка в сетке: превью, полоса, проценты, крестик отмены; обложка — звёздочкой, на месте; порядок — перетаскиванием (на телефоне — долгим нажатием); файлы можно бросить на галерею мышью. Фото больше 2560 px или 2 МБ браузер ужимает до отправки. Образцы разметки — в шапке `gallery.html`.
+
+**Запись уже есть** — всё сразу на сервере, ответ каждого роута — partial галереи (корень с `id`, `class="contents"`, `data-drag-sort="<url порядка>"`):
+
+| Роут | Принимает | Отвечает |
+| --- | --- | --- |
+| `POST …/images` | поле `file` — **один** файл на запрос | partial галереи |
+| `POST …/images/order` | `order` — id всех плиток по порядку | partial галереи |
+| `POST …/images/{id}/cover` | — | partial галереи, **порядок плиток прежний** |
+| `POST …/images/{id}/delete` | — | partial галереи |
+
+Роуты — в `actions_router` с `csrf_validate` (токен шлёт заголовком и сам загрузчик). Ошибка — доменное исключение: `web/errors.py` отдаст её тостом, загрузчик покажет текст на плитке. Плитка — `gallery_ui.tile(id, file_urls[key | thumbnail], is_cover=...)` с `cover_form` и `delete_form` внутри.
+
+**Записи ещё нет (черновик)** — обёртка с `data-gallery-draft`, файл — в `tmp/` автора (`store_tmp_upload`), ответ — `gallery_ui.draft_tile(key, url, 'image_keys')`, вставка `beforeend` в контейнер плиток с пустым `data-drag-sort`. Порядок — порядок полей `image_keys`, обложка — `gallery_ui.draft_cover_input('cover_key')`; без выбора обложка — первое фото. Сохранение формы — `claim_uploads(user.id, keys, FOLDER)`. Ошибка ввода в остальной форме — перерисовать черновик из присланных ключей, отфильтровав чужие (`tmp_owner`).
+
+Своя дорога для типа, который формой не отправить (видео частями в S3), — `galleryUpload.register({ accepts, problem, upload })` в проектном скрипте: `upload` сам вставляет файл в галерею и завершается, когда он там.
 
 ## Переезд ключей
 

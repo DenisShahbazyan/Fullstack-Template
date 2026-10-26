@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* Общие файлы каркаса — одинаковы во всех проектах. */
+@import './gallery.css';
 
 @source '../app/templates/**/*.html';
 @source '../app/web/**/*.py';

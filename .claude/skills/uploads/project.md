@@ -2,7 +2,7 @@
 
 Проектный файл скилла `uploads`: в каждом проекте свой, как `domain/uploads/project.py`. При копировании шаблона в новый проект — заполнить.
 
-Решение и причины — [ADR 0002](../../../docs/DECISIONS/0002-s3-uploads.md).
+Решение и причины — [ADR 0002](../../../docs/DECISIONS/0002-s3-uploads.md), галерея в браузере — [ADR 0003](../../../docs/DECISIONS/0003-gallery-component.md).
 
 ## Папки
 

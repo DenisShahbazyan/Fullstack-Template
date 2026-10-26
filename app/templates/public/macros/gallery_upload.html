@@ -1,0 +1,101 @@
+{#- Галерея с загрузкой: плитки фото, отметка обложки, удаление, порядок
+    перетаскиванием. Общий файл каркаса: одинаков во всех проектах (скилл
+    uploads, «Галерея»). Скрипты — static/js/gallery-upload.js,
+    gallery-draft.js, drag-sort.js, стили — tailwind/gallery.css.
+
+    Импорт — `{% import 'public/macros/gallery_upload.html' as gallery_ui %}`: имя
+    `gallery` обычно занято данными галереи.
+
+    Галерея записи из базы — каждое действие сразу на сервере, ответ —
+    перерисованная галерея:
+        <section {{ gallery_ui.uploader('/admin/items/1/images', '#item-gallery', accept, max_size) }}>
+            {{ gallery_ui.pick_button(accept) }}
+            <div class="gallery-grid">
+                {% include 'admin/partials/item_gallery.html' %}   ← корень с id и data-drag-sort="<url>"
+                {{ gallery_ui.queue() }}
+            </div>
+        </section>
+
+    Черновик — записи ещё нет: файлы уходят во временную папку, ответ — плитка
+    draft_tile, порядок и обложка — поля формы (gallery-draft.js):
+        <div {{ gallery_ui.uploader('/admin/uploads/images', '#new-item-tiles', accept, max_size, 'beforeend') }} data-gallery-draft>
+            {{ gallery_ui.draft_cover_input('cover_key', cover) }}
+            <div class="gallery-grid">
+                <div id="new-item-tiles" class="contents" data-drag-sort>…draft_tile…</div>
+                {{ gallery_ui.queue() }}
+            </div>
+        </div> -#}
+{% from 'public/macros/modal.html' import confirm_dialog %}
+
+{#- Атрибуты обёртки: куда слать файлы и куда вставить ответ. -#}
+{% macro uploader(url, target, accept, max_size, swap='outerHTML') -%}
+data-gallery-upload data-upload-url="{{ url }}" data-upload-target="{{ target }}"
+data-upload-swap="{{ swap }}" data-accept="{{ accept }}" data-max-size="{{ max_size }}"
+{%- endmacro %}
+
+{#- `accept` браузера шире списка MIME: .mov он не всегда узнаёт по типу. -#}
+{% macro pick_button(accept, label='+ Добавить', class='btn btn-primary btn-sm', multiple=true) -%}
+<label class="{{ class }} shrink-0 cursor-pointer">
+    {{ label }}
+    <input type="file" class="sr-only" accept="{{ accept }}"{% if multiple %} multiple{% endif %}>
+</label>
+{%- endmacro %}
+
+{#- Плитки загрузки встают в ту же сетку, что и галерея, следом за ней. -#}
+{% macro queue() -%}
+<div class="contents" data-upload-queue></div>
+{%- endmacro %}
+
+{#- Плитка файла. `open` — выражение Alpine, открывающее просмотр; caller —
+    кнопки действий поверх плитки (cover_form, delete_form). -#}
+{% macro tile(drag_id, src, is_cover=false, open=none, label='', is_video=false) -%}
+<div class="gallery-cell{% if is_cover %} is-cover{% endif %}" data-drag-id="{{ drag_id }}">
+    {% if open %}<button type="button" class="gallery-thumb" @click="{{ open }}" aria-label="{{ label }}">{% endif %}
+    <img class="gallery-img" src="{{ src }}" alt="" loading="lazy" draggable="false" data-drag-ghost>
+    {% if is_video %}
+        <svg class="gallery-thumb-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+            <path d="M8 5.5v13l11-6.5z"/>
+        </svg>
+    {% endif %}
+    {% if open %}</button>{% endif %}
+    <span class="gallery-badge gallery-cover-badge">★ Обложка</span>
+    <div class="gallery-actions" data-drag-skip>{{ caller() if caller else '' }}</div>
+</div>
+{%- endmacro %}
+
+{#- Обложка — звёздочкой. Ответ перерисовывает галерею, но порядок плиток
+    тот же: обложка не прыгает на первое место под рукой. -#}
+{% macro cover_form(url, target) -%}
+<form class="gallery-make-cover" hx-post="{{ url }}" hx-target="{{ target }}" hx-swap="outerHTML">
+    <button type="submit" class="gallery-icon-btn" aria-label="Сделать обложкой" title="Сделать обложкой">☆</button>
+</form>
+{%- endmacro %}
+
+{% macro delete_form(url, target, title='Удалить файл?', text='Вернуть его можно только новой загрузкой.') -%}
+<form class="ml-auto" hx-post="{{ url }}" hx-target="{{ target }}" hx-swap="outerHTML" x-data="{ confirming: false }">
+    <button type="button" class="gallery-icon-btn" aria-label="Удалить" title="Удалить" @click="confirming = true">✕</button>
+    {{ confirm_dialog(title, text) }}
+</form>
+{%- endmacro %}
+
+{#- Плитка черновика: ключ временной загрузки уходит с формой полем `field`
+    по порядку плиток. Убрать — только из формы: файл во временной папке
+    уберёт ночная чистка. -#}
+{% macro draft_tile(key, src, field, with_cover=true) -%}
+<div class="gallery-cell" data-drag-id="{{ key }}" data-draft-key="{{ key }}">
+    <input type="hidden" name="{{ field }}" value="{{ key }}">
+    <img class="gallery-img" src="{{ src }}" alt="" draggable="false" data-drag-ghost>
+    <span class="gallery-badge gallery-cover-badge">★ Обложка</span>
+    <div class="gallery-actions" data-drag-skip>
+        {% if with_cover %}
+        <button type="button" class="gallery-icon-btn gallery-make-cover" data-draft-make-cover
+                aria-label="Сделать обложкой" title="Сделать обложкой">☆</button>
+        {% endif %}
+        <button type="button" class="gallery-icon-btn ml-auto" data-draft-remove aria-label="Убрать" title="Убрать">✕</button>
+    </div>
+</div>
+{%- endmacro %}
+
+{% macro draft_cover_input(name, value='') -%}
+<input type="hidden" name="{{ name }}" value="{{ value }}" data-draft-cover>
+{%- endmacro %}

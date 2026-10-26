@@ -13,6 +13,9 @@
     <script src="/static/js/alpine.min.js?v={{ static_version('js/alpine.min.js') }}" defer></script>
     <script src="/static/js/csrf.js?v={{ static_version('js/csrf.js') }}" defer></script>
     <script src="/static/js/toasts.js?v={{ static_version('js/toasts.js') }}" defer></script>
+    <script src="/static/js/drag-sort.js?v={{ static_version('js/drag-sort.js') }}" defer></script>
+    <script src="/static/js/gallery-upload.js?v={{ static_version('js/gallery-upload.js') }}" defer></script>
+    <script src="/static/js/gallery-draft.js?v={{ static_version('js/gallery-draft.js') }}" defer></script>
     <script>
         document.addEventListener('htmx:afterSwap', (event) => {
             if (window.Alpine) Alpine.initTree(event.detail.target);
