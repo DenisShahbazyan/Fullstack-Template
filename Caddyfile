@@ -1,3 +1,10 @@
+# Адрес с www — на основной: одна страница не живёт под двумя адресами.
+# Сертификат на www Caddy получит, только если у www есть DNS-запись;
+# без неё основной домен работает, а в логе — ошибки выпуска сертификата.
+www.{$DOMAIN} {
+    redir https://{$DOMAIN}{uri} permanent
+}
+
 {$DOMAIN} {
     # Тело запроса режем до приложения: Starlette принимает multipart целиком,
     # и только потом read_upload сверяет MAX_UPLOAD_BYTES (20 МБ). Без этой
@@ -42,6 +49,24 @@
                 path /api/public/v1/files/upload
             }
         }
+    }
+
+    # HTML страниц сжимается в разы; картинки и так сжаты, их Caddy не трогает.
+    encode zstd gzip
+
+    # Заголовки безопасности. CSP: Alpine вычисляет выражения через Function —
+    # без 'unsafe-eval' он не работает; inline-скрипт в base.html и style от
+    # htmx требуют 'unsafe-inline'; фото — подписанные ссылки на S3__URL
+    # (бакет приватный, адресация path-style). Новый внешний источник (карта,
+    # видео, счётчик) — дописать сюда, иначе браузер его молча заблокирует.
+    # HSTS без includeSubDomains: на поддоменах может жить что-то без https.
+    header {
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: {$S3__URL}; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        X-Frame-Options DENY
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+        Strict-Transport-Security "max-age=31536000"
+        Permissions-Policy "geolocation=(), microphone=(), camera=()"
     }
 
     reverse_proxy web:8000
