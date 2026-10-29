@@ -34,6 +34,7 @@
    | --- | --- |
    | `pyproject.toml` | `name` |
    | `.env.template`, `.env.local` | `SITE__NAME`, `DB__NAME` |
+   | `.env.test` | `TEST_DB__NAME` |
    | `.env.docker` | `DOCKER_IMAGE_NAME`, `SITE__NAME`, `POSTGRES_DB`, `DB__NAME` |
    | `CLAUDE.md`, `docs/` | название в заголовках |
 
@@ -77,10 +78,10 @@ make dev                                         # скачает Tailwind, со
 
 ### Тесты
 
-Нужна отдельная база из `.env.test` (по умолчанию `pytest_db`): таблицы создаются и удаляются на каждый тест.
+Нужна отдельная база из `.env.test` (по умолчанию `myproject_pytest_db` — у каждого проекта своя: параллельные прогоны в общей базе мешают друг другу): таблицы создаются и удаляются на каждый тест.
 
 ```sh
-createdb -h localhost -U postgres pytest_db
+createdb -h localhost -U postgres myproject_pytest_db
 make test
 ```
 
