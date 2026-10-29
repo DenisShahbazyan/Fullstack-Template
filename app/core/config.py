@@ -4,7 +4,7 @@ from typing import Self
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, PostgresDsn, ValidationInfo, model_validator
+from pydantic import BaseModel, Field, PostgresDsn, ValidationInfo, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent.parent
@@ -76,9 +76,11 @@ class S3(BaseModel):
 
     URL: str = 'https://s3.twcstorage.ru'
     REGION: str = 'ru-1'
-    ACCESS_KEY: str = ''
-    SECRET_KEY: str = ''
-    BUCKET_NAME: str = ''
+    # Пустые значения роняют старт: иначе приложение поднимется, а страницы
+    # с фото будут отдавать 502 на каждой подписи ссылки.
+    ACCESS_KEY: str = Field('', min_length=1)
+    SECRET_KEY: str = Field('', min_length=1)
+    BUCKET_NAME: str = Field('', min_length=1)
 
     TMP_PATH: str = 'tmp'
     MAX_UPLOAD_BYTES: int = 20 * 1024 * 1024
