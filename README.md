@@ -84,7 +84,7 @@ make test
 
 ## Деплой
 
-Пуш в `main` → GitHub Actions ([.github/workflows/main.yml](.github/workflows/main.yml)): ruff и ty → сборка образов приложения и Postgres в Docker Hub → копирование `docker-compose.yml`, `Caddyfile`, `.env.docker` на сервер в `/home/<SERVER_USER>/<DOCKER_IMAGE_NAME>/` → `docker compose up -d`. Миграции применяет сервис `migrate` до старта `web`.
+Пуш в `main` → GitHub Actions ([.github/workflows/main.yml](.github/workflows/main.yml)): сборка образов приложения и Postgres в Docker Hub → копирование `docker-compose.yml`, `Caddyfile`, `.env.docker` на сервер в `/home/<SERVER_USER>/<DOCKER_IMAGE_NAME>/` → `docker compose up -d`. Миграции применяет сервис `migrate` до старта `web`.
 
 **Секреты репозитория** (Settings → Secrets and variables → Actions):
 
