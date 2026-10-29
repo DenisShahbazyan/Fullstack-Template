@@ -66,15 +66,19 @@ class HtmlErrorRenderer:
         """Страница целиком, а для HTMX — всплывашка вместо содержимого блока.
 
         Фрагмент с текстом ошибки затирал бы обновляемый блок: неудачное
-        добавление строки стирало бы с экрана весь список. Пустое тело
-        оставляет блок как был, а сообщение приходит заголовком.
+        добавление строки стирало бы с экрана весь список. `HX-Reswap: none`
+        оставляет блок как был — пустое тело htmx иначе вставил бы на его
+        место, — а сообщение приходит заголовком.
 
         Ответ со статусом 200 намеренно: htmx по умолчанию не обрабатывает
         ошибочные, и заголовок с сообщением никто бы не прочитал.
         """
         message = self._user_detail(status_code, detail)
         if request.headers.get('HX-Request') == 'true':
-            return attach_toast(Response(status_code=HTTPStatus.OK), message)
+            response = Response(
+                status_code=HTTPStatus.OK, headers={'HX-Reswap': 'none'}
+            )
+            return attach_toast(response, message)
         return render(
             request,
             'public/pages/error.html',
