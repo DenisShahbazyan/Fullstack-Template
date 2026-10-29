@@ -48,6 +48,8 @@ tailwind: $(TAILWIND_BIN)
 
 css: $(TAILWIND_BIN)
 	$(TAILWIND_BIN) -i tailwind/input.css -o static/css/app.css --minify
+	@# Tailwind не ставит перевод строки в конце, а pre-commit его требует.
+	@printf '\n' >> static/css/app.css
 
 css-watch: $(TAILWIND_BIN)
 	$(TAILWIND_BIN) -i tailwind/input.css -o static/css/app.css --watch
