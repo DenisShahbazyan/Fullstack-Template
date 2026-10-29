@@ -1,0 +1,17 @@
+{#- Значок «?» с пояснением к полю или блоку. Открывается кликом (и касанием
+    на телефоне), закрывается кликом мимо или Escape; на узком экране окно
+    встаёт снизу во всю ширину. Текст — через `caller()`:
+    {% call help_popover('Как считается доставка') %}…{% endcall %}
+    Окно раскрывается влево от значка; `opens='right'` — вправо, для значка
+    у левого края. -#}
+{% macro help_popover(title, opens='left') -%}
+<span class="relative inline-block align-middle" x-data="{ open: false }"
+      @click.outside="open = false" @keydown.escape.window="open = false">
+    <button type="button" class="help-button" @click="open = !open"
+            :aria-expanded="open ? 'true' : 'false'" aria-label="{{ title }}">?</button>
+    <span x-show="open" x-cloak x-transition.opacity role="dialog" aria-label="{{ title }}"
+          class="help-popover{% if opens == 'right' %} help-popover--left{% endif %}">
+        {{ caller() }}
+    </span>
+</span>
+{%- endmacro %}

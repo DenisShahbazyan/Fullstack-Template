@@ -1,0 +1,75 @@
+{#- Выбор дат вместо системного <input type="date"> (static/js/date-picker.js,
+    скилл frontend, «Выбор дат»). Значения — YYYY-MM-DD в скрытых полях;
+    `min` и `max` — тоже YYYY-MM-DD, None — без границы. -#}
+
+{#- Один день. Скрытое поле шлёт change — форма вокруг ловит его
+    `hx-trigger="change"` или отправляется вместе с остальными полями. -#}
+{% macro date_field(name, value, label='Дата', min=None, max=None) -%}
+<div class="inline-flex" x-data="datePicker" {% if min %}data-min="{{ min }}"{% endif %} {% if max %}data-max="{{ max }}"{% endif %}
+     @click.outside="open && close()" @keydown.escape="open && close()">
+    <input type="hidden" name="{{ name }}" value="{{ value }}" x-ref="input">
+    <button type="button" class="input-field picker-field" x-ref="field" aria-label="{{ label }}"
+            aria-haspopup="dialog" :aria-expanded="open" :class="open && 'is-open'" @click="toggle()">
+        {{ calendar_icon() }}
+        <span x-text="label"></span>
+    </button>
+    <template x-if="open">
+        <div class="picker-pop" x-ref="pop" tabindex="-1" role="dialog" aria-label="Выбор даты">
+            {{ month_grid() }}
+        </div>
+    </template>
+</div>
+{%- endmacro %}
+
+{#- Диапазон: два клика — начало и конец, затем форма вокруг уходит сама. -#}
+{% macro date_range(start_name, start, end_name, end, label='Свои даты', min=None, max=None) -%}
+<div class="inline-flex" x-data="rangePicker" {% if min %}data-min="{{ min }}"{% endif %} {% if max %}data-max="{{ max }}"{% endif %}
+     @click.outside="open && close()" @keydown.escape="open && close()">
+    <input type="hidden" name="{{ start_name }}" x-ref="start" value="{{ start }}">
+    <input type="hidden" name="{{ end_name }}" x-ref="end" value="{{ end }}">
+    <button type="button" class="btn btn-ghost btn-sm" x-ref="field" aria-haspopup="dialog" :aria-expanded="open" @click="toggle()">
+        {{ calendar_icon() }} {{ label }}
+    </button>
+    <template x-if="open">
+        <div class="picker-pop picker-pop--range" x-ref="pop" tabindex="-1" role="dialog" aria-label="{{ label }}"
+             @mouseleave="hoverDay(null)">
+            {{ month_grid() }}
+            <div class="picker-pop__foot">
+                <template x-for="range in quickRanges" :key="range.label">
+                    <button type="button" class="picker-quick" x-text="range.label"
+                            @click="pickRange(range.from, range.to)"></button>
+                </template>
+            </div>
+            <p class="picker-pop__note" x-text="note"></p>
+        </div>
+    </template>
+</div>
+{%- endmacro %}
+
+{#- Месяц в окошке. Ждёт от компонента Alpine: monthTitle, cells,
+    shiftMonth(step), pickDay(date), hoverDay(date). -#}
+{% macro month_grid() -%}
+<div class="picker-month__head">
+    <button type="button" class="picker-month__nav" aria-label="Предыдущий месяц" @click="shiftMonth(-1)">‹</button>
+    <span x-text="monthTitle"></span>
+    <button type="button" class="picker-month__nav" aria-label="Следующий месяц" @click="shiftMonth(1)">›</button>
+</div>
+<div class="picker-month">
+    {% for weekday in ('Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс') %}
+        <span class="picker-month__weekday">{{ weekday }}</span>
+    {% endfor %}
+    <template x-for="cell in cells" :key="cell.key">
+        <button type="button" class="picker-day" :class="cell.blank ? 'invisible' : cell.classes"
+                :disabled="cell.blank || cell.disabled" x-text="cell.label"
+                @click="pickDay(cell.date)" @mouseenter="hoverDay(cell.date)"></button>
+    </template>
+</div>
+{%- endmacro %}
+
+{#- Иконка календаря на кнопке выбора дат. -#}
+{% macro calendar_icon() -%}
+<svg class="picker-field__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/>
+</svg>
+{%- endmacro %}

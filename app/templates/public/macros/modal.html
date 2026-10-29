@@ -2,16 +2,40 @@
     Кнопка открытия — снаружи: `x-data="{ confirming: false }"` на обёртке,
     `@click="confirming = true"` на кнопке типа button. Подтверждение —
     submit формы, внутри которой стоит макрос. -#}
-{% macro confirm_dialog(title, text, confirm_label='Удалить') -%}
+{% macro confirm_dialog(title, text, confirm_label='Удалить', dismiss_label='Отмена') -%}
 <div x-show="confirming" x-cloak x-transition.opacity class="modal-backdrop"
      @click.self="confirming = false" @keydown.escape.window="confirming = false">
     <div class="modal-panel" role="dialog" aria-modal="true">
         <h2 class="modal-title">{{ title }}</h2>
         <p class="modal-text">{{ text }}</p>
         <div class="modal-actions">
-            <button type="button" class="btn btn-ghost" @click="confirming = false">Отмена</button>
-            <button type="submit" class="btn btn-danger">{{ confirm_label }}</button>
+            <button type="button" class="btn btn-ghost" @click="confirming = false">{{ dismiss_label }}</button>
+            {#- Выключается после первого нажатия: второе ушло бы вдогонку за
+                уже удалённым и вернуло 404. Выключить сразу нельзя — тогда
+                форма не отправится. -#}
+            <button type="submit" class="btn btn-danger" @click="setTimeout(() => $el.disabled = true)">{{ confirm_label }}</button>
         </div>
     </div>
 </div>
+{%- endmacro %}
+
+{#- Окно с формой, которое HTMX приносит в #modal (есть в обоих base.html).
+    Закрывается крестиком, Escape и кликом по подложке: окно просто удаляет
+    себя из DOM. Использование: {% call form_modal('Заголовок') %}…форма…{% endcall %} -#}
+{% macro form_modal(title) -%}
+<div class="modal-backdrop" x-data x-init="$nextTick(() => $el.querySelector('[autofocus]')?.focus())"
+     @click.self="$el.remove()" @keydown.escape.window="$el.remove()">
+    <div class="modal-panel modal-panel-wide" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-head">
+            <h2 class="modal-title mb-0" id="modal-title">{{ title }}</h2>
+            <button type="button" class="modal-close" aria-label="Закрыть" @click="$root.remove()">✕</button>
+        </div>
+        {{ caller() }}
+    </div>
+</div>
+{%- endmacro %}
+
+{#- Кнопка «Отмена» внутри окна form_modal. -#}
+{% macro cancel_button(label='Отмена') -%}
+<button type="button" class="btn btn-ghost" @click="$el.closest('.modal-backdrop').remove()">{{ label }}</button>
 {%- endmacro %}

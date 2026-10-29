@@ -154,6 +154,144 @@
     .modal-text { color: var(--color-ink-muted); font-size: 0.9375rem; }
     .modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem; }
 
+    /* Окно с формой (form_modal): заголовок с крестиком, длинная форма
+       прокручивается внутри окна. */
+    .modal-panel-wide { max-width: 34rem; max-height: calc(100dvh - 2rem); overflow-y: auto; }
+    .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+    .modal-close { padding: 0.25rem 0.5rem; border-radius: var(--radius-md); color: var(--color-ink-muted); cursor: pointer; }
+    .modal-close:hover { background: var(--color-surface-muted); color: var(--color-ink); }
+
+    /* Пояснение по значку «?» (макрос help_popover). */
+    .help-button {
+        display: inline-grid;
+        place-items: center;
+        width: 1.25rem;
+        height: 1.25rem;
+        border-radius: 9999px;
+        background: var(--color-surface-muted);
+        color: var(--color-ink-muted);
+        font-size: 0.75rem;
+        font-weight: 700;
+        line-height: 1;
+        cursor: pointer;
+    }
+    .help-button:hover, .help-button[aria-expanded='true'] { background: var(--color-brand-600); color: var(--color-on-brand); }
+    .help-popover {
+        position: absolute;
+        z-index: 50;
+        top: calc(100% + 0.5rem);
+        right: -0.5rem;
+        display: block;
+        width: min(26rem, calc(100vw - 2rem));
+        padding: 1rem 1.125rem;
+        border: 1px solid var(--color-line);
+        border-radius: var(--radius-lg);
+        background: var(--color-surface);
+        box-shadow: var(--shadow-pop);
+        font-size: 0.8125rem;
+        font-weight: 400;
+        line-height: 1.5;
+        color: var(--color-ink);
+        text-align: left;
+    }
+    .help-popover--left { left: 0; right: auto; }
+    /* На телефоне окно у значка уезжает за край: показываем его снизу
+       во всю ширину экрана. */
+    @media (max-width: 640px) {
+        .help-popover { position: fixed; top: auto; left: 1rem; right: 1rem; bottom: 1rem; width: auto; max-height: 70vh; overflow-y: auto; }
+    }
+
+    /* Выбор дат (static/js/date-picker.js). Окошко стоит fixed: внутри
+       прокручиваемого окна его обрезало бы. Координаты — переменными. */
+    .picker-field { display: flex; align-items: center; gap: 0.5rem; width: auto; text-align: left; font-variant-numeric: tabular-nums; cursor: pointer; }
+    .picker-field:hover { border-color: var(--color-ink-dim); }
+    .picker-field.is-open { border-color: var(--color-brand-500); box-shadow: 0 0 0 3px var(--color-brand-100); }
+    .picker-field__icon { flex-shrink: 0; color: var(--color-ink-muted); }
+    .picker-pop {
+        position: fixed;
+        z-index: 75;
+        top: var(--pop-top, 0);
+        left: var(--pop-left, 0);
+        width: max-content;
+        padding: 0.75rem;
+        border: 1px solid var(--color-line);
+        border-radius: var(--radius-lg);
+        background: var(--color-surface);
+        box-shadow: var(--shadow-pop);
+    }
+    .picker-pop:focus { outline: none; }
+    /* На телефоне окошко диапазона встаёт снизу во всю ширину: под кнопкой
+       справа оно уехало бы за край экрана. */
+    @media (max-width: 30rem) {
+        .picker-pop--range { top: auto; bottom: 1rem; left: 1rem; right: 1rem; width: auto; }
+        .picker-pop--range .picker-month { justify-content: center; }
+    }
+    /* Окошко периода статистики (скилл admin-stats): стоит под кнопкой,
+       без расчёта координат; периоды — плитками по четыре в ряд. */
+    .picker-pop--period { position: absolute; top: calc(100% + 0.375rem); left: 0; width: 17rem; }
+    .picker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.25rem; }
+    .picker-section { margin-top: 0.625rem; padding-top: 0.625rem; border-top: 1px solid var(--color-line); }
+    .picker-chip { position: relative; display: flex; flex-direction: column; align-items: center; padding: 0.4375rem 0; border-radius: var(--radius-md); font-size: 0.875rem; }
+    .picker-chip:not(.is-on):not(.is-disabled):hover { background: var(--color-surface-muted); }
+    .picker-chip.is-on { background: var(--color-brand-600); color: var(--color-on-brand); font-weight: 700; }
+    .picker-chip.is-disabled { color: var(--color-ink-dim); }
+    .picker-chip.is-current::after {
+        content: '';
+        position: absolute;
+        top: 0.3125rem;
+        right: 0.375rem;
+        width: 0.3125rem;
+        height: 0.3125rem;
+        border-radius: 9999px;
+        background: var(--color-brand-600);
+    }
+    .picker-chip.is-on.is-current::after { background: var(--color-on-brand); }
+    .picker-chip__note { font-size: 0.6875rem; font-weight: 400; color: var(--color-ink-muted); }
+    .picker-chip.is-on .picker-chip__note { color: var(--color-brand-100); }
+    .picker-chip.is-disabled .picker-chip__note { color: var(--color-ink-dim); }
+    .picker-pop__foot { display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem; margin-top: 0.625rem; padding-top: 0.625rem; border-top: 1px solid var(--color-line); }
+    .picker-pop__note { margin-top: 0.5rem; font-size: 0.75rem; color: var(--color-ink-muted); }
+    .picker-quick { padding: 0.1875rem 0.625rem; border: 1px solid var(--color-line); border-radius: 9999px; font-size: 0.75rem; cursor: pointer; }
+    .picker-quick:hover { border-color: var(--color-brand-500); color: var(--color-brand-700); }
+    .picker-month__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem; font-weight: 700; font-size: 0.875rem; }
+    .picker-month__nav { width: 1.75rem; height: 1.75rem; border-radius: 9999px; font-size: 1.0625rem; line-height: 1; cursor: pointer; }
+    .picker-month__nav:hover { background: var(--color-surface-muted); }
+    .picker-month { display: grid; grid-template-columns: repeat(7, 2.125rem); row-gap: 0.125rem; text-align: center; }
+    .picker-month__weekday { padding: 0.125rem 0 0.25rem; font-size: 0.6875rem; font-weight: 600; color: var(--color-ink-dim); }
+    .picker-day { position: relative; height: 2.125rem; border-radius: 9999px; font-size: 0.875rem; font-variant-numeric: tabular-nums; cursor: pointer; }
+    .picker-day:not(:disabled):not(.is-on):hover { background: var(--color-surface-muted); }
+    .picker-day.is-weekend { color: var(--color-brand-700); }
+    .picker-day.is-span { border-radius: 0; background: var(--color-brand-50); }
+    .picker-day.is-on { background: var(--color-brand-600); color: var(--color-on-brand); font-weight: 700; }
+    .picker-day.is-today::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        bottom: 0.25rem;
+        width: 0.25rem;
+        height: 0.25rem;
+        margin-left: -0.125rem;
+        border-radius: 9999px;
+        background: var(--color-brand-600);
+    }
+    .picker-day.is-on.is-today::after { background: var(--color-on-brand); }
+    .picker-day:disabled { color: var(--color-line); cursor: default; }
+
+    /* Тепловая таблица статистики (скилл admin-stats): насыщенность клетки —
+       доля от максимума, `--heat` от 0 до 1 приходит из данных. */
+    .heat-table { border-collapse: separate; border-spacing: 3px; font-size: 0.75rem; }
+    .heat-table th { font-weight: 500; color: var(--color-ink-muted); padding: 0 0.25rem; text-align: center; }
+    .heat-table tbody th { text-align: left; padding-right: 0.5rem; }
+    .heat-cell {
+        min-width: 2rem;
+        height: 2rem;
+        border-radius: 0.375rem;
+        text-align: center;
+        color: var(--color-ink);
+        background: color-mix(in oklab, var(--color-brand-500) calc(var(--heat, 0) * 100%), var(--color-surface-muted));
+    }
+    .heat-cell.is-dark { color: var(--color-on-brand); }
+
     /* Всплывающие сообщения (static/js/toasts.js). Правый нижний угол:
        не накрывает шапку. */
     .toast-stack {

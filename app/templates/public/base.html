@@ -4,18 +4,24 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token }}">
+    {#- Цвет панели браузера на телефоне — фирменный, как --color-brand-600. -#}
+    <meta name="theme-color" content="#4f46e5">
+    <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <title>{% block title %}{{ site_name }}{% endblock %}</title>
     {% block seo %}{% endblock %}
 
     <link rel="stylesheet" href="/static/css/app.css?v={{ static_version('css/app.css') }}">
     {% block head %}{% endblock %}
     <script src="/static/js/htmx.min.js?v={{ static_version('js/htmx.min.js') }}"></script>
+    {#- До Alpine: компоненты регистрируются на alpine:init. -#}
+    <script src="/static/js/date-picker.js?v={{ static_version('js/date-picker.js') }}" defer></script>
     <script src="/static/js/alpine.min.js?v={{ static_version('js/alpine.min.js') }}" defer></script>
     <script src="/static/js/csrf.js?v={{ static_version('js/csrf.js') }}" defer></script>
     <script src="/static/js/toasts.js?v={{ static_version('js/toasts.js') }}" defer></script>
     <script src="/static/js/drag-sort.js?v={{ static_version('js/drag-sort.js') }}" defer></script>
     <script src="/static/js/gallery-upload.js?v={{ static_version('js/gallery-upload.js') }}" defer></script>
     <script src="/static/js/gallery-draft.js?v={{ static_version('js/gallery-draft.js') }}" defer></script>
+    <script src="/static/js/phone-input.js?v={{ static_version('js/phone-input.js') }}" defer></script>
     <script>
         document.addEventListener('htmx:afterSwap', (event) => {
             if (window.Alpine) Alpine.initTree(event.detail.target);
@@ -63,6 +69,9 @@
             © {{ site_name }}
         </div>
     </footer>
+{#- Сюда HTMX кладёт окна с формой (макрос form_modal). -#}
+<div id="modal"></div>
+
 {#- Сообщение из ?toast=: скрипт заберёт его и покажет всплывашкой. -#}
 {% if toast %}
 <div hidden data-toast="{{ toast }}" data-toast-kind="{{ toast_kind }}"></div>
