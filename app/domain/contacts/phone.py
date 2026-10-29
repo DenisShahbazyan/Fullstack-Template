@@ -41,6 +41,8 @@ def phone_search_digits(query: str) -> str | None:
 
 
 def tel_href(phone: str) -> str:
-    """Ссылка для звонка из номера, записанного как угодно: `tel:+7…`."""
-    digits = ''.join(char for char in phone if char.isdigit() or char == '+')
-    return f'tel:{digits}'
+    """Ссылка `tel:` из номера как его пишут: «8 910 303-21-70» → `tel:+79103032170`."""
+    digits = ''.join(char for char in phone if char.isdigit())
+    if len(digits) == 11 and digits.startswith('8'):
+        digits = f'7{digits[1:]}'
+    return f'tel:+{digits}'
