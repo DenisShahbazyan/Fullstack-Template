@@ -11,3 +11,7 @@ class AdminRoleAssignmentError(PermissionDeniedError):
 
 class UserNotFoundError(NotFoundError):
     message = 'Пользователь не найден'
+
+
+class StaleOrderError(ConflictError):
+    message = 'Список изменился в другой вкладке — порядок не сохранён'

@@ -57,7 +57,25 @@ def redirect_with_toast(
     message: str,
     kind: str = 'error',
 ) -> RedirectResponse:
-    """Редирект, после которого на новой странице всплывёт сообщение.
+    """Редирект, после которого на новой странице всплывёт сообщение."""
+    return redirect(_with_toast(path, message, kind))
+
+
+def htmx_redirect_with_toast(
+    path: str,
+    message: str,
+    kind: str = 'error',
+) -> Response:
+    """То же для HTMX-запроса: браузер перейдёт на страницу целиком.
+
+    Нужен, когда фрагментом ответить нельзя — страница устарела и её
+    состояние уже не совпадает с базой.
+    """
+    return Response(headers={'HX-Redirect': _with_toast(path, message, kind)})
+
+
+def _with_toast(path: str, message: str, kind: str) -> str:
+    """Адрес с сообщением в параметре.
 
     Параметр вставляется перед якорем: за «#» начинается фрагмент, и
     дописанный туда query до сервера бы просто не доехал.
@@ -68,4 +86,4 @@ def redirect_with_toast(
     if kind != 'error':
         query += f'&{TOAST_KIND_PARAM}={quote(kind)}'
     target = f'{base}{separator}{query}'
-    return redirect(f'{target}#{fragment}' if fragment else target)
+    return f'{target}#{fragment}' if fragment else target
