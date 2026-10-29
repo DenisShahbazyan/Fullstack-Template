@@ -1,6 +1,6 @@
 ---
 name: frontend
-description: Фронтенд (Jinja + HTMX + Alpine + Tailwind v4) — реактивность через hx-swap-oob, ответы окон, свои окна вместо alert/confirm/hx-confirm, тосты, редирект после формы, токены цветов, сборка CSS, static_version. Использовать при создании или правке любой формы, шаблона, partial, HTMX-роута, вёрстки или JS.
+description: Фронтенд (Jinja + HTMX + Alpine + Tailwind v4) — реактивность через hx-swap-oob, ответы окон, окно с формой form_modal, свои окна вместо alert/confirm/hx-confirm, тосты, редирект после формы, выбор дат date_field/date_range, порядок перетаскиванием, пояснение «?», фильтры показа денег и дат, токены цветов, сборка CSS, static_version. Использовать при создании или правке любой формы, шаблона, partial, HTMX-роута, вёрстки или JS.
 ---
 
 # Фронтенд: HTMX, окна, вёрстка
@@ -21,16 +21,46 @@ description: Фронтенд (Jinja + HTMX + Alpine + Tailwind v4) — реак
 
 ## Окна и ответы
 
+- **Окно с формой** — partial с макросом `form_modal(title)` из `templates/public/macros/modal.html`, кнопка «Отмена» — `cancel_button()`. Кнопка открытия — `hx-get="…/new" hx-target="#modal"` (контейнер `#modal` есть в обоих `base.html`), форма внутри — `hx-post` с `hx-target="#modal"`: ошибку ввода роут отвечает тем же окном с введёнными данными.
 - **Ответ на действие в окне** — пустое тело (окно закрывается) + oob-блоки + тост. Элементы внутри формы с `hx-target` на окно наследуют цель — у вложенных `hx-get` цель указывается явно.
 - **Обычная форма** после успеха — `redirect` / `redirect_with_toast` (`web/toasts.py`), иначе F5 отправит её снова. Ошибку ввода показываем той же страницей с введёнными данными и `toast_context(...)`.
-- **Ошибка в HTMX-запросе** приходит тостом: `web/errors.py` отвечает 200 с пустым телом и `HX-Trigger`, чтобы не затереть блок.
+- **Ошибка в HTMX-запросе** приходит тостом: `web/errors.py` отвечает 200 с пустым телом, `HX-Reswap: none` и `HX-Trigger`, чтобы не затереть блок.
+- **Страница устарела** (список поменяли в другой вкладке) — фрагментом не ответить: `htmx_redirect_with_toast(url, message)` перезагружает страницу целиком с тостом.
+- **Список после сохранения** перерисовывается с тем же поиском и страницей: параметры адреса — `current_page_query(request)` из `web/dependencies.py` (заголовок `HX-Current-URL`).
 
 ## Никаких браузерных диалогов
 
 `alert()`, `confirm()`, `prompt()` и `hx-confirm` запрещены и на сайте, и в админке (ловит pre-commit-хук `scripts/checks/no_browser_dialogs.sh`).
 
 - **Подтверждение** — макрос `confirm_dialog` из `templates/public/macros/modal.html`: `x-data="{ confirming: false }"` на обёртке, кнопка `type="button"` открывает окно, подтверждение — submit формы. Закрытие по Escape и клику по подложке.
+- Кнопка подтверждения выключается после первого нажатия: второе ушло бы за уже удалённым и вернуло 404.
 - **Итог действия** — тост (`static/js/toasts.js`): `window.toast(...)`, `HX-Trigger` из ответа (`attach_toast`) или `?toast=` после редиректа.
+
+## Выбор дат
+
+Системный `<input type="date">` не используем: на разных браузерах он разный и не стилизуется. Макросы из `templates/public/macros/date_picker.html` (скрипт `static/js/date-picker.js`, подключён в обоих `base.html`):
+
+- `date_field(name, value, min=None, max=None)` — один день. Значение `YYYY-MM-DD` в скрытом поле; выбор шлёт `change` — форма с `hx-trigger="change"` уходит сама, обычная форма отправит его со всеми полями.
+- `date_range(start_name, start, end_name, end, label, min=None, max=None)` — диапазон: два клика, затем форма вокруг отправляется сама; быстрые «Эта неделя» и «Прошлая неделя».
+- Границы `min`/`max` — тоже `YYYY-MM-DD`; «сегодня» — `local_today()` из `core/clock.py`, не `date.today()`: сервер живёт в UTC. Сервер всё равно проверяет дату в схеме.
+- Окошко стоит `fixed` и не обрезается прокруткой окна с формой.
+
+## Порядок перетаскиванием
+
+Список, который админ упорядочивает руками (разделы, акции, FAQ): `data-drag-sort="<url>"` на списке, `data-drag-id` на строке (`static/js/drag-sort.js`) — новый порядок уходит полем `order` (id всех строк), ответ заменяет список.
+
+- Позиции считает `sort_orders(ordered_ids, existing_ids)` из `domain/admin/ordering.py`: шаг 10, первый — 0. Прислан не тот набор id, что в базе, — `StaleOrderError`: список поменяли в другой вкладке, роут отвечает `htmx_redirect_with_toast(url, error.message)`, а не раскладывает чужой список.
+- Новая запись — в конец: `next_sort_order(...)`.
+- Запись позиций — метод CRUD сущности `set_sort_orders(session, positions)` (id → позиция), коммит — в роуте. Изменение порядка — действие администрации: аудит.
+
+## Показ значений
+
+Числа и даты форматирует Python — фильтры в `web/templates.py`, функции в `web/formatting.py`:
+
+- `money` — «1 500», «1 500,50» (узкий неразрывный пробел, копейки только если есть); знак ₽ — в шаблоне рядом.
+- `local_dt` — `created_at` (UTC) по местным часам, `to_local` — то же без форматирования; `relative_day` — «сегодня», «вчера», «через 3 дня» для местной даты.
+- `phone_display`, `tel` — телефон (скилл `phone-input`); `ru_plural` — «3 записи».
+- **Пояснение к полю или блоку** — значок «?» макросом `help_popover(title)` из `templates/public/macros/help.html`, текст — через `{% call %}`.
 
 ## Стек и вёрстка
 

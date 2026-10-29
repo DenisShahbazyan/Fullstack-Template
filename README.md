@@ -7,7 +7,7 @@
 ## Что внутри
 
 - **Пользователи:** регистрация и вход по email (fastapi-users), JWT в HttpOnly-cookie для сайта и Bearer для API, скользящая сессия, роли `USER` / `MODER` / `ADMIN`.
-- **Сайт:** главная, вход, регистрация, страница ошибок, тосты, CSRF на всех формах.
+- **Сайт:** главная, вход, регистрация, страница ошибок, тосты, CSRF на всех формах. Свои окна (подтверждение, форма в окне), выбор дат, маска телефона, пояснения «?», местное время (`SITE__TIMEZONE`).
 - **Админка** `/admin`: панель, пользователи со сменой роли, журнал аудита. То же в API: `/api/admin/v1/...`.
 - **Загрузки:** приватный бакет S3 со своими ключами, фото в WebP с превью, подписанные ссылки, временные загрузки для API, ночная чистка сирот, ежедневная копия бакета к другому провайдеру ([ADR 0002](docs/DECISIONS/0002-s3-uploads.md)). Галерея с загрузкой: плитка с прогрессом на каждый файл, обложка, порядок перетаскиванием ([ADR 0003](docs/DECISIONS/0003-gallery-component.md)).
 - **Инфраструктура:** базовый CRUD с тестами, доменные ошибки → HTTP-коды, JSON-логи с request id, Swagger на `/docs`, `/health`.
@@ -40,10 +40,12 @@
    После правки `pyproject.toml` — `uv lock`.
 
 3. Заполнить `.env.docker`: `DOCKER_USERNAME`, `DOMAIN`, все `change-me` (пароли и секреты — `openssl rand -base64 48`), `POSTGRES_USER`/`POSTGRES_PASSWORD` совпадают с `DB__USERNAME`/`DB__PASSWORD`. Раздел `BACKUPS` — по [docs/guide/ops/backups.md](docs/guide/ops/backups.md), `UPLOADS BACKUP` — по [uploads-backups.md](docs/guide/ops/uploads-backups.md). `S3__*` — **свой бакет проекта** и ключ только к нему. Файл коммитится вместе с секретами — **репозиторий должен быть приватным**.
-4. В `.env.local` сгенерировать свои `JWT__SECRET` и `CSRF__SECRET` (`openssl rand -hex 32`) и вписать `S3__*` — отдельный dev-бакет проекта, не продовый и не от другого проекта.
-5. Заполнить §5 и §7 (предметная часть) в `CLAUDE.md`, `docs/spec/v01.md`, `docs/plan/mvp.md`; `.claude/skills/backups/project.md`; когда у проекта появятся файлы — ещё `.claude/skills/uploads/project.md`.
-6. Палитру сайта — токены `@theme` в `tailwind/input.css`.
-7. Первая миграция `alembic/versions/…_first_migration.py` уже есть. Новые модели — `make revision m="..."`.
+4. В `.env.local` сгенерировать свои `JWT__SECRET` и `CSRF__SECRET` (`openssl rand -hex 32`) и вписать `S3__*` — отдельный dev-бакет проекта, не продовый и не от другого проекта. Без ключей S3 приложение (и тесты) не стартует. `SITE__TIMEZONE` — пояс посетителей, если не Москва.
+5. Заполнить §5 и §7 (предметная часть) в `CLAUDE.md`, `docs/spec/v01.md`, `docs/plan/mvp.md`; `.claude/skills/backups/project.md`; когда у проекта появятся файлы — ещё `.claude/skills/uploads/project.md`, поле телефона — `.claude/skills/phone-input/project.md`.
+6. Палитру сайта — токены `@theme` в `tailwind/input.css`; тот же фирменный цвет — в `theme-color` (`templates/public/base.html`) и в `static/img/favicon.svg` (заменить на знак проекта).
+7. **Нужна ли регистрация.** Если пользователей заводит только администратор (`make admin`, затем `/admin/users`) — убрать `/register`: `web/public/pages/auth.py`, `public/pages/register.html`, кнопку в шапке `public/base.html`, `/register/submit` из зоны `auth` в `Caddyfile`, упоминание в §8 `CLAUDE.md`.
+8. Внешний источник на страницах (карта, видео, счётчик, шрифты с CDN) — дописать в `Content-Security-Policy` в `Caddyfile`, иначе браузер молча его заблокирует. Если у домена нет `www` в DNS — убрать блок `www.{$DOMAIN}`.
+9. Первая миграция `alembic/versions/…_first_migration.py` уже есть. Новые модели — `make revision m="..."`.
 
 ## Локальный запуск
 

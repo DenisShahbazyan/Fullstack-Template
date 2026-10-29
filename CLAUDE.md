@@ -77,7 +77,7 @@ Python 3.14 · FastAPI · SQLAlchemy 2.0 + Alembic · PostgreSQL 18 (бэкап�
 - `AuditLog` — журнал изменяющих действий администрации.
 - _TODO: сущности предметной области._
 
-Субдомены `app/domain/`: `auth/` (пароли), `admin/` (правила смены ролей), _TODO: субдомены предметной области_.
+Субдомены `app/domain/`: `auth/` (пароли), `admin/` (правила смены ролей, ручной порядок списков), `contacts/` (телефон), `stats/` (периоды статистики), _TODO: субдомены предметной области_.
 
 ## 6. Язык
 
@@ -92,6 +92,9 @@ Python 3.14 · FastAPI · SQLAlchemy 2.0 + Alembic · PostgreSQL 18 (бэкап�
 - **Изменяющее действие администрации пишется в аудит**: новое значение `AuditActionEnum` + `record_action(...)` (`core/admin/audit.py`) в той же сессии и том же коммите.
 - Меняешь **схему БД** (модель, индекс, enum, миграция) → скилл `migrations`. Схему описывают модели, а не миграции.
 - Шаблон, форма, HTMX-роут, вёрстка, JS → скилл `frontend`.
+- Поле телефона в форме, валидация, хранение, поиск или показ номера → скилл `phone-input`. Номер хранится только как `+79XXXXXXXXX` (тип `Phone`): по нему ищут человека и держат уникальность.
+- Страница статистики или отчёт в админке → скилл `admin-stats`.
+- **«Сегодня» и время для человека — по местным часам**: `local_now()`/`local_today()` из `core/clock.py` (`SITE__TIMEZONE`), `created_at` на странице — фильтром `local_dt`. `date.today()` и `datetime.now()` сервер считает в UTC: вечером «сегодня» уже завтра.
 - Файл в S3 (новое поле, папка, загрузка, галерея фото, показ, удаление) → скилл `uploads`. **Колонка с ключом файла — `mapped_column(info=file_folder(FOLDER))`** (`models/file_keys.py`); без пометки чистка не видит колонку, а в общей папке удалит её файлы.
 - Тронул `docker/postgres/`, `docker/uploads-backup/`, сервисы `db`/`backup`/`uploads_backup`, версию Postgres, имя базы или завёл новое хранилище данных; рискованная миграция на проде → скилл `backups`. Бэкапы ломаются молча: алерт придёт через сутки, а то и при восстановлении.
 
@@ -103,13 +106,13 @@ Python 3.14 · FastAPI · SQLAlchemy 2.0 + Alembic · PostgreSQL 18 (бэкап�
 app/
 ├── main.py, asgi.py                       # FastAPI; точка входа granian (X-Forwarded-* от Caddy)
 ├── api/{public,admin}/v1/endpoints/       # JSON API
-├── web/{public,admin}/{pages,partials}/   # SSR + HTMX-фрагменты; templates.py (render), toasts.py, errors.py
+├── web/{public,admin}/{pages,partials}/   # SSR + HTMX-фрагменты; templates.py (render, фильтры), formatting.py, toasts.py, errors.py
 ├── templates/{public,admin}/{macros,pages,partials}/   # у каждой стороны свой base.html
 ├── schemas/{public,admin}/v1/             # Pydantic
 ├── crud/{public,admin}/                   # доступ к БД; _base.py — общий CRUD
 ├── domain/<субдомен>/                     # бизнес-логика, общая для public и admin
 ├── models/                                # SQLAlchemy, одни на обе стороны
-└── core/                                  # config, db, csrf, auth/, admin/, logs/, middleware/, docs/, s3/ (загрузки)
+└── core/                                  # config, db, csrf, clock, auth/, admin/, logs/, middleware/, docs/, s3/ (загрузки)
 static/ (css, js, img), tailwind/input.css, docker/postgres/, alembic/, tests/, scripts/, docs/
 ```
 
