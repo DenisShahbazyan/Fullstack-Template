@@ -149,6 +149,10 @@
         border-radius: var(--radius-lg);
         background: var(--color-surface);
         box-shadow: var(--shadow-pop);
+        /* Окно, открытое из ячейки таблицы, наследовало бы её nowrap и
+           выравнивание и вылезало бы за край. */
+        white-space: normal;
+        text-align: left;
     }
     .modal-title { font-size: 1.125rem; font-weight: 700; margin-bottom: 0.5rem; }
     .modal-text { color: var(--color-ink-muted); font-size: 0.9375rem; }
@@ -203,7 +207,7 @@
 
     /* Выбор дат (static/js/date-picker.js). Окошко стоит fixed: внутри
        прокручиваемого окна его обрезало бы. Координаты — переменными. */
-    .picker-field { display: flex; align-items: center; gap: 0.5rem; width: auto; text-align: left; font-variant-numeric: tabular-nums; cursor: pointer; }
+    .picker-field { display: flex; align-items: center; gap: 0.5rem; text-align: left; font-variant-numeric: tabular-nums; cursor: pointer; }
     .picker-field:hover { border-color: var(--color-ink-dim); }
     .picker-field.is-open { border-color: var(--color-brand-500); box-shadow: 0 0 0 3px var(--color-brand-100); }
     .picker-field__icon { flex-shrink: 0; color: var(--color-ink-muted); }
@@ -255,7 +259,8 @@
     .picker-quick:hover { border-color: var(--color-brand-500); color: var(--color-brand-700); }
     .picker-month__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem; font-weight: 700; font-size: 0.875rem; }
     .picker-month__nav { width: 1.75rem; height: 1.75rem; border-radius: 9999px; font-size: 1.0625rem; line-height: 1; cursor: pointer; }
-    .picker-month__nav:hover { background: var(--color-surface-muted); }
+    .picker-month__nav:not(:disabled):hover { background: var(--color-surface-muted); }
+    .picker-month__nav:disabled { color: var(--color-line); cursor: default; }
     .picker-month { display: grid; grid-template-columns: repeat(7, 2.125rem); row-gap: 0.125rem; text-align: center; }
     .picker-month__weekday { padding: 0.125rem 0 0.25rem; font-size: 0.6875rem; font-weight: 600; color: var(--color-ink-dim); }
     .picker-day { position: relative; height: 2.125rem; border-radius: 9999px; font-size: 0.875rem; font-variant-numeric: tabular-nums; cursor: pointer; }
