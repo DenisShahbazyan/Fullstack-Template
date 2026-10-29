@@ -1,4 +1,5 @@
 from http import HTTPStatus
+from urllib.parse import parse_qsl, urlsplit
 
 from fastapi import Depends, Request
 from fastapi.responses import RedirectResponse
@@ -53,3 +54,13 @@ def safe_next_url(url: str, fallback: str = '/') -> str:
     if url.startswith('/') and not url.startswith('//'):
         return url
     return fallback
+
+
+def current_page_query(request: Request) -> dict[str, str]:
+    """Параметры адреса страницы, с которой пришёл HTMX-запрос.
+
+    Перерисованный после сохранения список должен остаться с тем же
+    поиском и на той же странице, а их знает только адрес страницы.
+    """
+    url = request.headers.get('HX-Current-URL', '')
+    return dict(parse_qsl(urlsplit(url).query))
