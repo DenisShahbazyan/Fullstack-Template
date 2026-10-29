@@ -3,30 +3,19 @@ from fastapi.templating import Jinja2Templates
 from fastapi_csrf_protect import CsrfProtect
 from itsdangerous import BadData, URLSafeTimedSerializer
 
+from app.core.clock import utc_to_local
 from app.core.config import APP_DIR, settings
 from app.core.csrf import CSRF_SALT
+from app.domain.contacts.phone import format_phone, tel_href
 from app.domain.uploads.types import IMAGE_TYPES
 from app.domain.uploads.urls import thumbnail_key
+from app.web.formatting import local_dt, money, relative_day, ru_plural
 from app.web.toast_params import TOAST_KIND_PARAM, TOAST_PARAM
 
 templates = Jinja2Templates(directory=str(APP_DIR / 'templates'))
 # Необязательные поля (фамилия, email) приходят как None, а Jinja печатает его
 # строкой «None». Пустое значение на странице — это пусто, а не слово.
 templates.env.finalize = lambda value: '' if value is None else value
-
-
-def _ru_plural(count: int, forms: str) -> str:
-    """`forms` — три формы через `|`: «запись|записи|записей»."""
-    one, few, many = forms.split('|')
-    n = abs(count) % 100
-    if 11 <= n <= 14:
-        return many
-    rem = n % 10
-    if rem == 1:
-        return one
-    if 2 <= rem <= 4:
-        return few
-    return many
 
 
 def _static_version(path: str) -> str:
@@ -52,7 +41,13 @@ def _canonical_for(request: Request, path: str) -> str:
     return f'{request.url.scheme}://{request.url.netloc}{path}'
 
 
-templates.env.filters['ru_plural'] = _ru_plural
+templates.env.filters['ru_plural'] = ru_plural
+templates.env.filters['money'] = money
+templates.env.filters['phone_display'] = format_phone
+templates.env.filters['tel'] = tel_href
+templates.env.filters['local_dt'] = local_dt
+templates.env.filters['to_local'] = utc_to_local
+templates.env.filters['relative_day'] = relative_day
 templates.env.filters['full_name'] = _full_name
 # Ссылка на превью есть в file_urls рядом со ссылкой на оригинал: фильтр
 # только выбирает ключ, `file_urls[key | thumbnail]`.

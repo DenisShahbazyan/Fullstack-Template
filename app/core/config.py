@@ -66,9 +66,12 @@ class Static(BaseModel):
 
 
 class Site(BaseModel):
-    """То, что видит посетитель: название в заголовках и шапке."""
+    """То, что видит посетитель: название в заголовках и шапке, его часы."""
 
     NAME: str = 'MyProject'
+    # Местные часы (core/clock.py): «сегодня» и время на страницах — в них,
+    # а сервер живёт в UTC.
+    TIMEZONE: str = 'Europe/Moscow'
 
 
 class S3(BaseModel):
