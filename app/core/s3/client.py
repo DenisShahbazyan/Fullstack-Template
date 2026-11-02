@@ -10,11 +10,14 @@ import base64
 import hashlib
 from collections.abc import AsyncGenerator, Generator, Sequence
 from contextlib import asynccontextmanager, contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from functools import cached_property
 from typing import Any
 
 import aioboto3
+import botocore.auth
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
@@ -45,6 +48,29 @@ _MISSING_CODES = frozenset(
         'NoSuchLifecycleConfiguration',
     }
 )
+
+# Время подписи — начало окна, а не «сейчас»: ссылка на файл одна и та же от ответа
+# к ответу, и браузер не качает заново картинку, которую перерисовал HTMX.
+# botocore берёт время из get_current_datetime в момент подписи; ContextVar держит
+# подмену внутри своей задачи, остальные запросы к S3 подписываются как обычно.
+_signed_at: ContextVar[datetime | None] = ContextVar('signed_at', default=None)
+_botocore_now = botocore.auth.get_current_datetime
+
+
+def _signing_now(remove_tzinfo: bool = True) -> datetime:
+    fixed = _signed_at.get()
+    if fixed is None:
+        return _botocore_now(remove_tzinfo)
+    return fixed.replace(tzinfo=None) if remove_tzinfo else fixed
+
+
+# Подмена намеренная: другого способа задать время подписи botocore не даёт.
+botocore.auth.get_current_datetime = _signing_now  # ty: ignore[invalid-assignment]
+
+
+def _window_start(window: int) -> datetime:
+    now = int(datetime.now(UTC).timestamp())
+    return datetime.fromtimestamp(now - now % window, UTC)
 
 
 @dataclass(frozen=True)
@@ -167,18 +193,23 @@ class S3Client:
 
         Сама подпись локальная и стоит доли миллисекунды, а поднять клиент —
         заметно дольше. Галерея подписывает десятки ключей за запрос.
+        В пределах окна в `expires_in` ссылка не меняется и живёт не меньше его.
         """
         if not keys:
             return []
-        async with self.raw() as client:
-            return [
-                await client.generate_presigned_url(
-                    'get_object',
-                    Params={'Bucket': self.bucket, 'Key': key},
-                    ExpiresIn=expires_in,
-                )
-                for key in keys
-            ]
+        token = _signed_at.set(_window_start(expires_in))
+        try:
+            async with self.raw() as client:
+                return [
+                    await client.generate_presigned_url(
+                        'get_object',
+                        Params={'Bucket': self.bucket, 'Key': key},
+                        ExpiresIn=2 * expires_in,
+                    )
+                    for key in keys
+                ]
+        finally:
+            _signed_at.reset(token)
 
 
 @contextmanager
