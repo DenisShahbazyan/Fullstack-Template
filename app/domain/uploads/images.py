@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from PIL import Image, ImageOps
 
-from app.domain.uploads.errors import ImageTooLargeError
+from app.domain.uploads.errors import ImageTooLargeError, InvalidCropError
 
 WEBP_FORMAT = 'WEBP'
 WEBP_EXTENSION = 'webp'
@@ -43,6 +43,51 @@ def process_image(raw: bytes, max_side: int, quality: int) -> ProcessedImage:
         image = to_display_mode(source)
         image.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
         return encode_webp(image, quality)
+
+
+@dataclass(frozen=True)
+class CropBox:
+    """Квадратный кадр в долях: x и y — от своей стороны, size — от меньшей.
+
+    Доли, а не пиксели: исходник ужимается при сохранении, и кадр в пикселях
+    поехал бы вместе с масштабом. Сторона считается от меньшей стороны,
+    поэтому квадрат влезает при любой ориентации; выход за границу отсекается
+    при вырезании — здесь пропорции изображения неизвестны.
+
+    Raises:
+        InvalidCropError: доли вне 0..1.
+    """
+
+    x: float
+    y: float
+    size: float
+
+    def __post_init__(self) -> None:
+        if not 0 < self.size <= 1 or not 0 <= self.x <= 1 or not 0 <= self.y <= 1:
+            raise InvalidCropError()
+
+
+def process_square(
+    raw: bytes, box: CropBox, max_side: int, quality: int
+) -> ProcessedImage:
+    """Вырезает квадрат по кадру, ужимает до max_side и переводит в WebP.
+
+    Raises:
+        ImageTooLargeError: в изображении больше MAX_IMAGE_PIXELS точек.
+        OSError: файл не читается как изображение.
+    """
+    with open_image(raw) as source:
+        image = crop_square(to_display_mode(source), box)
+        image.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
+        return encode_webp(image, quality)
+
+
+def crop_square(image: Image.Image, box: CropBox) -> Image.Image:
+    """Вырезает квадрат по долям, прижимая кадр внутрь изображения."""
+    side = round(min(image.width, image.height) * box.size)
+    left = min(round(image.width * box.x), image.width - side)
+    top = min(round(image.height * box.y), image.height - side)
+    return image.crop((left, top, left + side, top + side))
 
 
 def open_image(raw: bytes) -> Image.Image:

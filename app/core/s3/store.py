@@ -7,10 +7,10 @@ from dataclasses import dataclass
 from fastapi import UploadFile
 
 from app.core.config import settings
-from app.core.images import process_with_thumbnail
+from app.core.images import process_square_with_thumbnail, process_with_thumbnail
 from app.core.s3.client import s3_client
 from app.domain.uploads.errors import FileTooLargeError
-from app.domain.uploads.images import ProcessedImage
+from app.domain.uploads.images import CropBox, ProcessedImage
 from app.domain.uploads.project import UPLOAD_TYPES
 from app.domain.uploads.types import (
     EXTENSIONS,
@@ -73,7 +73,26 @@ async def store_image(raw: bytes, folder: str) -> StoredUpload:
         ImageTooLargeError: в изображении слишком много точек.
         FileStorageUnavailableError: хранилище не приняло файл.
     """
-    processed, thumbnail = await process_with_thumbnail(raw)
+    return await _store_with_thumbnail(*await process_with_thumbnail(raw), folder)
+
+
+async def store_square(raw: bytes, box: CropBox, folder: str) -> StoredUpload:
+    """Кладёт квадрат по кадру (фото профиля) в WebP и его превью рядом.
+
+    Raises:
+        InvalidCropError: доли кадра вне 0..1.
+        ImageProcessingError: изображение не читается.
+        ImageTooLargeError: в изображении слишком много точек.
+        FileStorageUnavailableError: хранилище не приняло файл.
+    """
+    return await _store_with_thumbnail(
+        *await process_square_with_thumbnail(raw, box), folder
+    )
+
+
+async def _store_with_thumbnail(
+    processed: ProcessedImage, thumbnail: ProcessedImage, folder: str
+) -> StoredUpload:
     key = new_key(folder, processed.extension, str(uuid.uuid4()))
     await save_processed(processed, key)
     await save_processed(thumbnail, thumbnail_key(key))

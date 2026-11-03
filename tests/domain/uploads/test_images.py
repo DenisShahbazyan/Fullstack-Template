@@ -4,8 +4,8 @@ import pytest
 from PIL import Image
 
 from app.domain.uploads import images
-from app.domain.uploads.errors import ImageTooLargeError
-from app.domain.uploads.images import process_image
+from app.domain.uploads.errors import ImageTooLargeError, InvalidCropError
+from app.domain.uploads.images import CropBox, process_image, process_square
 
 MAX_SIDE = 2048
 QUALITY = 85
@@ -63,3 +63,26 @@ def test_image_over_pixel_limit_is_rejected(monkeypatch):
     monkeypatch.setattr(images, 'MAX_IMAGE_PIXELS', 300 * 200 - 1)
     with pytest.raises(ImageTooLargeError):
         process_image(make_image(300, 200), MAX_SIDE, QUALITY)
+
+
+def test_square_is_cut_at_full_resolution():
+    result = process_square(make_image(1200, 900), CropBox(0, 0, 1), MAX_SIDE, QUALITY)
+    assert (result.width, result.height) == (900, 900)
+
+
+def test_square_is_scaled_down_to_max_side():
+    result = process_square(make_image(4000, 3000), CropBox(0, 0, 1), MAX_SIDE, QUALITY)
+    assert (result.width, result.height) == (MAX_SIDE, MAX_SIDE)
+
+
+def test_square_past_the_edge_is_pressed_inside():
+    result = process_square(
+        make_image(1000, 500), CropBox(0.9, 0, 1), MAX_SIDE, QUALITY
+    )
+    assert (result.width, result.height) == (500, 500)
+
+
+@pytest.mark.parametrize(('x', 'y', 'size'), [(0, 0, 0), (0, 0, 1.5), (-0.1, 0, 1)])
+def test_crop_outside_unit_range_is_rejected(x: float, y: float, size: float):
+    with pytest.raises(InvalidCropError):
+        CropBox(x, y, size)

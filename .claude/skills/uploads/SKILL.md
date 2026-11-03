@@ -10,7 +10,7 @@ description: Загрузка, показ и удаление файлов в S3
 ## Как устроено
 
 - **Бакет приватный и у каждого проекта свой** — в проде и локально. Колонка хранит ключ (`portfolio/<uuid>.webp`), не URL; ссылка подписывается на `S3__PRESIGNED_TTL_SECONDS`.
-- **Изображение** (тип — по сигнатуре) уходит в WebP не больше `S3__IMAGE_MAX_SIDE` плюс превью `<ключ>_thumb.webp` (`S3__THUMBNAIL_SIDE`). **Документ** из `DOCUMENT_TYPES` хранится как есть, без превью. Видео и всё, что больше `S3__MAX_UPLOAD_BYTES`, через сервер не идёт — браузер грузит его прямо в S3 частями.
+- **Изображение** (тип — по сигнатуре) уходит в WebP не больше `S3__IMAGE_MAX_SIDE` плюс превью `<ключ>_thumb.webp` (`S3__THUMBNAIL_SIDE`). **Квадрат по кадру** (фото профиля: исходник и кадр в долях `CropBox`) — та же пара: кадр в полном разрешении до `S3__IMAGE_MAX_SIDE` и `_thumb` на `S3__SQUARE_THUMBNAIL_SIDE` (`store_square`). Своего ресайза и файлов без `_thumb` у проектов нет. **Документ** из `DOCUMENT_TYPES` хранится как есть, без превью. Видео и всё, что больше `S3__MAX_UPLOAD_BYTES`, через сервер не идёт — браузер грузит его прямо в S3 частями.
 - **Две дороги.** Форма сайта: роут сразу кладёт файл в постоянную папку. API: `POST /api/public/v1/files/upload` кладёт в `tmp/<user_id>/`, запись потом принимает ключ через `claim_uploads`.
 - **Ночная чистка сирот** (сервис `uploads_sweep`, 04:30 UTC): удаляет файлы из папок помеченных колонок и `tmp/`, которые старше `S3__ORPHAN_TTL_HOURS` и на которые не ссылаются колонки с пометкой `file_folder`/`file_keys_in_json`. Колонки и папки чистка находит сама в метаданных моделей. Если сирот больше половины (при 100+ файлах), отказывается — `ImplausibleOrphanSweepError` в логе.
 - **Копия бакета** — сервис `uploads_backup`, rclone к другому провайдеру, всё кроме `tmp/`. Новая папка попадает в копию сама.
@@ -20,7 +20,7 @@ description: Загрузка, показ и удаление файлов в S3
 | Что | Где |
 | --- | --- |
 | Клиент S3 (ошибки — доменные) | `core/s3/client.py`, `s3_client` |
-| Приём файла формы, WebP + превью | `core/s3/store.py`: `read_upload`, `store_upload`, `store_image` |
+| Приём файла формы, WebP + превью | `core/s3/store.py`: `read_upload`, `store_upload`, `store_image`, `store_square` (кадр) |
 | Временные загрузки API | `core/s3/claim.py`: `store_tmp_upload`, `claim_uploads`, `copy_to_folder` |
 | Ссылки | `core/s3/links.py`: `signed_url`, `signed_urls_by_key` |
 | Удаление | `core/s3/discard.py`: `discard_files` |

@@ -17,6 +17,10 @@ class ImageTooLargeError(ValidationError):
     message = 'Фото слишком большое. Загрузите снимок до 60 мегапикселей'
 
 
+class InvalidCropError(ValidationError):
+    message = 'Не удалось применить кадр фото. Выберите область заново'
+
+
 class ForeignUploadError(ValidationError):
     message = 'Файл не найден среди ваших загрузок. Загрузите его заново'
 
