@@ -99,8 +99,8 @@ description: Загрузка, показ и удаление файлов в S3
 Перед первой чисткой на новом бакете и после правки пометок `file_folder` — просмотр без удаления:
 
 ```bash
-sudo docker compose --env-file .env.docker exec -T web \
-    python -m scripts.uploads.sweep_orphans --dry-run < /dev/null > sweep.txt
+sudo docker compose --env-file .env.docker run --rm --no-deps -T --entrypoint python web \
+    -m scripts.uploads.sweep_orphans --dry-run < /dev/null > sweep.txt
 head -40 sweep.txt
 ```
 

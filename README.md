@@ -87,7 +87,7 @@ make test
 
 ## Деплой
 
-Пуш в `main` → GitHub Actions ([.github/workflows/main.yml](.github/workflows/main.yml)): сборка образов приложения и Postgres в Docker Hub → копирование `docker-compose.yml`, `Caddyfile`, `.env.docker` на сервер в `/home/<SERVER_USER>/<DOCKER_IMAGE_NAME>/` → `docker compose up -d`. Миграции применяет сервис `migrate` до старта `web`.
+Пуш в `main` → GitHub Actions ([.github/workflows/main.yml](.github/workflows/main.yml)): сборка образов приложения и Postgres в Docker Hub → копирование `docker-compose.yml`, `Caddyfile`, `.env.docker` на сервер в `/home/<SERVER_USER>/<DOCKER_IMAGE_NAME>/` → [scripts/deploy/deploy.sh](scripts/deploy/deploy.sh) на сервере: без `down`, `web` обновляется по очереди и сайт не останавливается, остальное пересоздаётся, только если изменилось. Миграции применяет сервис `migrate` до нового `web`. Сколько процессов и контейнеров `web` — раздел «МАСШТАБ» в `.env.docker`.
 
 **Секреты репозитория** (Settings → Secrets and variables → Actions):
 
@@ -102,8 +102,9 @@ make test
 После первого деплоя:
 
 ```sh
-sudo docker compose --env-file .env.docker exec web \
-    python -m scripts.users.create_user admin@example.com --role admin
+# run, а не exec: экземпляров web может быть несколько, и номер 1 не всегда есть
+sudo docker compose --env-file .env.docker run --rm --no-deps --entrypoint python web \
+    -m scripts.users.create_user admin@example.com --role admin
 sudo docker logs postgres_backup     # бэкапы: в конце «Восстановление прошло успешно.»
 ```
 

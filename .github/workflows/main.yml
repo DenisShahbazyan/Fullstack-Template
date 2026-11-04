@@ -39,7 +39,7 @@ jobs:
           echo "uploads_backup_image=$user/$DOCKER_IMAGE_NAME-uploads-backup:latest" >> "$GITHUB_OUTPUT"
 
   copy_infra_to_server:
-    name: Copy docker-compose.yml and Caddyfile
+    name: Copy docker-compose.yml, Caddyfile and deploy script
     runs-on: ubuntu-latest
     needs: config
     env:
@@ -60,7 +60,7 @@ jobs:
       - name: Prepare files for transfer
         run: |
           mkdir transfer
-          cp docker-compose.yml Caddyfile .env.docker transfer/
+          cp docker-compose.yml Caddyfile .env.docker scripts/deploy/deploy.sh transfer/
 
       - name: Copy files
         uses: appleboy/scp-action@v1.0.0
@@ -140,14 +140,6 @@ jobs:
 
             echo "${{ secrets.DOCKER_PASSWORD }}" | sudo docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-            # env_file отдаёт значения только внутрь контейнера, а интерполяция
-            # ${...} в самом compose-файле берёт их из --env-file. sudo вычищает
-            # окружение (sudoers без setenv), поэтому передаём файл явно.
-            sudo docker compose --env-file .env.docker pull
-            sudo docker compose --env-file .env.docker down --remove-orphans
-            sudo docker compose --env-file .env.docker up -d
-
-            # Пуш перезаписывает тег :latest, и предыдущий образ остаётся на
-            # диске без тега. За десяток деплоев это гигабайты. Без -a: чистим
-            # только dangling, образы с тегами (postgres, caddy и т.п.) нужны.
-            sudo docker image prune -f
+            # Без down: web обновляется по очереди, остальное — только
+            # изменившееся (scripts/deploy/deploy.sh в репозитории).
+            sudo sh deploy.sh

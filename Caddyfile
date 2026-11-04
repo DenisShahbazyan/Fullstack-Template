@@ -1,6 +1,22 @@
 # Адрес с www — на основной: одна страница не живёт под двумя адресами.
 # Сертификат на www Caddy получит, только если у www есть DNS-запись;
 # без неё основной домен работает, а в логе — ошибки выпуска сертификата.
+# Все экземпляры web (WEB_REPLICAS): Caddy спрашивает DNS Docker каждые
+# 5 секунд, новый экземпляр начинает получать запросы сам. Остановленный при
+# деплое ещё до 5 секунд в списке: короткий dial_timeout и повтор на другой
+# экземпляр, а fail_duration убирает его из выбора — запрос не теряется.
+(web_upstreams) {
+    dynamic a web 8000 {
+        refresh 5s
+    }
+    lb_policy round_robin
+    lb_try_duration 5s
+    fail_duration 30s
+    transport http {
+        dial_timeout 1s
+    }
+}
+
 www.{$DOMAIN} {
     redir https://{$DOMAIN}{uri} permanent
 }
@@ -70,5 +86,7 @@ www.{$DOMAIN} {
         Permissions-Policy "geolocation=(), microphone=(), camera=()"
     }
 
-    reverse_proxy web:8000
+    reverse_proxy {
+        import web_upstreams
+    }
 }

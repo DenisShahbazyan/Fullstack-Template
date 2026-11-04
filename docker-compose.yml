@@ -113,10 +113,20 @@ services:
       - .env.docker
 
   web:
+    # Без container_name: экземпляров несколько (WEB_REPLICAS), Caddy находит
+    # их по имени сервиса. Деплой обновляет их по очереди: scripts/deploy/deploy.sh.
     image: ${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME}:latest
-    container_name: fastapi
     logging: *default-logging
     restart: always
+    deploy:
+      replicas: ${WEB_REPLICAS:-1}
+    # Деплой гасит старые экземпляры, только когда новые отвечают.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
     depends_on:
       migrate:
         condition: service_completed_successfully
