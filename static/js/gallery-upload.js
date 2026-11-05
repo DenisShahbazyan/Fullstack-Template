@@ -268,7 +268,9 @@
         // eventInfo — detail событий htmx:afterSwap: без него обработчики
         // страницы (Alpine.initTree, тосты) получат пустой detail.target.
         const eventInfo = { target, elt: target };
-        if (html && target) htmx.swap(target, html, { swapStyle: c.swap }, { eventInfo });
+        // htmx.swap не шлёт htmx:beforeSwap: порядок экрана держим сами.
+        const kept = window.dragSort ? dragSort.keepOrder(target, html) : html;
+        if (kept && target) htmx.swap(target, kept, { swapStyle: c.swap }, { eventInfo });
         c.root.dispatchEvent(new CustomEvent('gallery-upload:placed', { bubbles: true }));
     }
 

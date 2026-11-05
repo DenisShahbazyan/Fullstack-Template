@@ -38,6 +38,37 @@
         return itemsOf(list).map((item) => item.dataset.dragId);
     }
 
+    // Ответ, заменяющий список, встаёт в порядке экрана: сервер рисует
+    // обложку первой, а плитки под рукой прыгать не должны. Новые элементы —
+    // после известных, в порядке сервера.
+    function keepOrder(list, html) {
+        if (!html || !list?.matches?.('[data-drag-sort]')) return html;
+        const template = document.createElement('template');
+        template.innerHTML = html;
+        const fresh = list.id
+            ? template.content.getElementById(list.id)
+            : template.content.querySelector('[data-drag-sort]');
+        if (!fresh?.hasAttribute('data-drag-sort')) return html;
+        const rank = new Map(orderOf(list).map((id, index) => [id, index]));
+        const items = itemsOf(fresh);
+        const position = (item) => rank.get(item.dataset.dragId) ?? rank.size;
+        const sorted = [...items].sort((a, b) => position(a) - position(b));
+        const slots = items.map((item) => {
+            const slot = document.createComment('');
+            item.replaceWith(slot);
+            return slot;
+        });
+        slots.forEach((slot, index) => slot.replaceWith(sorted[index]));
+        return template.innerHTML;
+    }
+
+    window.dragSort = { keepOrder };
+
+    document.addEventListener('htmx:beforeSwap', (event) => {
+        const { detail } = event;
+        detail.serverResponse = keepOrder(detail.target, detail.serverResponse);
+    });
+
     // Призрак — копия одного помеченного куска, а не всего элемента: в нём
     // Alpine-формы, и их копия в body ожила бы второй раз.
     function makeGhost(item, rect) {
