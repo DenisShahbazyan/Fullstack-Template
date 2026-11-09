@@ -40,9 +40,15 @@ def process_image(raw: bytes, max_side: int, quality: int) -> ProcessedImage:
         OSError: файл не читается как изображение.
     """
     with open_image(raw) as source:
-        image = to_display_mode(source)
+        # JPEG декодируется сразу уменьшенным (в 2–8 раз), остальные — как есть.
+        source.draft('RGB', (max_side, max_side))
+        mode = _display_mode(source)
+        # Уже нужный режим — без лишней полноразмерной копии.
+        image = source if source.mode == mode else source.convert(mode)
+        # Уменьшаем до поворота: поворот полноразмерного снимка — ещё одна его копия.
+        # Рамка квадратная, поэтому ориентация на размер не влияет.
         image.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
-        return encode_webp(image, quality)
+        return encode_webp(ImageOps.exif_transpose(image), quality)
 
 
 @dataclass(frozen=True)
@@ -110,7 +116,11 @@ def open_image(raw: bytes) -> Image.Image:
 def to_display_mode(source: Image.Image) -> Image.Image:
     """Поворот по EXIF и режим цвета, который умеет WebP."""
     image = ImageOps.exif_transpose(source)
-    return image.convert('RGBA' if _has_alpha(image) else 'RGB')
+    return image.convert(_display_mode(image))
+
+
+def _display_mode(image: Image.Image) -> str:
+    return 'RGBA' if _has_alpha(image) else 'RGB'
 
 
 def encode_webp(image: Image.Image, quality: int) -> ProcessedImage:

@@ -4,6 +4,9 @@
 все запросы воркера.
 """
 
+import asyncio
+from collections.abc import Callable
+
 from starlette.concurrency import run_in_threadpool
 
 from app.core.config import settings
@@ -14,6 +17,15 @@ from app.domain.uploads.images import (
     process_image,
     process_square,
 )
+
+# Декодированный снимок — сотни мегабайт даже из файла в 200 КБ (однотонный PNG):
+# десяток загрузок разом съел бы память процесса. Остальные ждут очереди.
+_DECODING = asyncio.Semaphore(2)
+
+
+async def _in_thread[T](work: Callable[..., T], *args: object) -> T:
+    async with _DECODING:
+        return await run_in_threadpool(work, *args)
 
 
 async def process_image_in_thread(
@@ -26,7 +38,7 @@ async def process_image_in_thread(
         ImageTooLargeError: в изображении слишком много точек.
     """
     try:
-        return await run_in_threadpool(process_image, raw, max_side, quality)
+        return await _in_thread(process_image, raw, max_side, quality)
     except OSError as error:
         raise ImageProcessingError() from error
 
@@ -56,7 +68,7 @@ async def process_square_with_thumbnail(
         ImageTooLargeError: в изображении слишком много точек.
     """
     try:
-        processed = await run_in_threadpool(
+        processed = await _in_thread(
             process_square,
             raw,
             box,
