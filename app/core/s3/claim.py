@@ -15,7 +15,8 @@ from collections.abc import Collection, Sequence
 from app.core.config import settings
 from app.core.s3.client import s3_client
 from app.core.s3.store import store_upload
-from app.domain.uploads.errors import ForeignUploadError
+from app.domain.uploads.errors import ForeignUploadError, UnsupportedFileTypeError
+from app.domain.uploads.images import WEBP_EXTENSION
 from app.domain.uploads.urls import (
     extension_of,
     new_key,
@@ -23,6 +24,10 @@ from app.domain.uploads.urls import (
     tmp_folder,
     tmp_owner,
 )
+
+# Поле только для фото: любое изображение сервер уже сохранил в WebP, а документ
+# из той же временной папки (PDF) сюда не годится.
+IMAGE_EXTENSIONS = frozenset({WEBP_EXTENSION})
 
 
 async def store_tmp_upload(raw: bytes, user_id: int) -> str:
@@ -41,20 +46,27 @@ async def claim_uploads(
     keys: Sequence[str],
     folder: str,
     kept: Collection[str] = (),
+    extensions: Collection[str] | None = None,
 ) -> list[str]:
     """Переносит временные загрузки пользователя в `folder`, отдаёт итоговые ключи.
 
     Ключи из `kept` — уже привязанные к той же записи — остаются как есть.
-    Порядок ключей сохраняется.
+    `extensions` — какие файлы годятся полю (для фото — `IMAGE_EXTENSIONS`);
+    None — любые из временной папки. Порядок ключей сохраняется.
 
     Raises:
         ForeignUploadError: ключ не временной загрузки этого пользователя.
+        UnsupportedFileTypeError: файл не того вида, что ждёт поле.
         StoredFileMissingError: загрузку уже удалила чистка сирот.
         FileStorageUnavailableError: хранилище не скопировало файл.
     """
     fresh = [key for key in dict.fromkeys(keys) if key not in kept]
     if any(tmp_owner(key, settings.s3.TMP_PATH) != user_id for key in fresh):
         raise ForeignUploadError()
+    if extensions is not None and any(
+        extension_of(key) not in extensions for key in fresh
+    ):
+        raise UnsupportedFileTypeError()
     moved = {key: _new_key_in(folder, key) for key in fresh}
     await s3_client.copy_many(_with_thumbnails(moved))
     return [moved.get(key, key) for key in keys]
