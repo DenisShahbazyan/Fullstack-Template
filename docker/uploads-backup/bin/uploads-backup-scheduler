@@ -12,6 +12,7 @@ DST="dst:${UPLOADS_BACKUP_BUCKET:-}"
 MIRROR="$DST/current"
 ARCHIVE="$DST/archive"
 STATE="$DST/state/last-success"
+LOCAL_STATE=/state/last-success
 
 RETENTION_DAYS=30
 RETRY_SECONDS=3600
@@ -20,6 +21,12 @@ RETRY_SECONDS=3600
 EXCLUDE="${UPLOADS_BACKUP_TMP_PATH:-tmp}/**"
 # Файл, загруженный за минуты до проверки, мог не попасть в синхронизацию.
 CHECK_MIN_AGE=10m
+# Потолок удалений за один sync. Обычные сутки — сотни файлов (удалённые фото
+# с превью, файлы задач, сироты); тысячи сразу — баг чистки или чужой ключ.
+# Тогда sync падает с /fail, а не переносит полбакета в archive/, откуда через
+# RETENTION_DAYS всё исчезло бы. Законную массовую чистку пропустить —
+# UPLOADS_BACKUP_MAX_DELETE в .env.docker на один деплой.
+MAX_DELETE="${UPLOADS_BACKUP_MAX_DELETE:-5000}"
 
 notify() {
     [ -n "${UPLOADS_BACKUP_PING_URL:-}" ] || return 0
@@ -36,7 +43,7 @@ source_has_objects() {
 
 mirror_uploads() {
     rclone sync "$SRC" "$MIRROR" --exclude "$EXCLUDE" \
-        --backup-dir "$ARCHIVE/$(date -u +%F)" \
+        --backup-dir "$ARCHIVE/$(date -u +%F)" --max-delete "$MAX_DELETE" \
         --transfers 8 --checkers 16 --stats-one-line -v
 }
 
@@ -87,7 +94,11 @@ if [ -z "${UPLOADS_BACKUP_BUCKET:-}" ]; then
 fi
 
 while :; do
-    if [ "$(last_success_day)" != "$(date -u +%F)" ] && ! run_backup; then
+    if [ "$(last_success_day)" = "$(date -u +%F)" ]; then
+        # Копию отметки читает uploads_sweep: без сегодняшней копии он не
+        # удаляет сирот, иначе они пропали бы и из бакета, и из копии.
+        date -u +%F > "$LOCAL_STATE.tmp" && mv "$LOCAL_STATE.tmp" "$LOCAL_STATE"
+    elif ! run_backup; then
         sleep "$RETRY_SECONDS"
     fi
     sleep 60

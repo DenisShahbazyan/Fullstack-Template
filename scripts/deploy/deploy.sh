@@ -18,6 +18,40 @@ WAIT_SECONDS=180
 
 compose pull
 
+# 0. Бэкапы. Пустой бакет — WAL молча отбрасываются, пустой heartbeat — сбой
+# никто не увидит. Выключить проверку — только явно, BACKUPS_ALLOW_EMPTY=1.
+if [ "$(env_value BACKUPS_ALLOW_EMPTY)" = 1 ]; then
+    echo "BACKUPS_ALLOW_EMPTY=1: деплой без проверки бэкапов." >&2
+else
+    for key in PGBACKREST_REPO1_S3_BUCKET BACKUP_PING_URL \
+        UPLOADS_BACKUP_BUCKET UPLOADS_BACKUP_PING_URL; do
+        if [ -z "$(env_value "$key")" ]; then
+            echo "$key в .env.docker пуст: бэкапы не работают, деплой отменён." >&2
+            exit 1
+        fi
+    done
+    # Архивация сломана — восстановить «на минуту до деплоя» нельзя, а
+    # миграция может быть необратимой. Тот же запрос, что в pg-backup-scheduler.
+    compose up -d db
+    tries=0
+    until compose exec -T db pg_isready -q; do
+        tries=$((tries + 1))
+        [ "$tries" -lt 60 ] || { echo "Postgres не поднялся." >&2; exit 1; }
+        sleep 2
+    done
+    failing=$(compose exec -T db sh -c \
+        'psql -U "$POSTGRES_USER" -d postgres -XAt' <<'SQL'
+SELECT coalesce(last_failed_time > coalesce(last_archived_time, 'epoch'), false)
+FROM pg_stat_archiver
+SQL
+)
+    if [ "$failing" != f ]; then
+        echo "WAL не уходят в репозиторий (pg_stat_archiver), деплой отменён:" \
+            "см. docker logs postgres." >&2
+        exit 1
+    fi
+fi
+
 # 1. Всё, кроме web и caddy. up сам ждёт migrate (uploads_sweep и воркеры
 # от него зависят), поэтому миграции применены до нового кода web.
 # Без --wait: migrate завершается, и --wait счёл бы это сбоем.

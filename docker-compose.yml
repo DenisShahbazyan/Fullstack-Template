@@ -1,3 +1,9 @@
+# Имя проекта задаёт имена volume (<имя>_postgres_data): без него compose
+# берёт имя каталога, и смена каталога подняла бы пустую базу рядом с
+# осиротевшей. Должно совпадать с именем каталога проекта на сервере
+# /home/<SERVER_USER>/<DOCKER_IMAGE_NAME> — под ним деплой уже создал volume.
+name: ${DOCKER_IMAGE_NAME}
+
 x-logging: &default-logging
   # json-file без лимита пишет лог контейнера до конца диска, и
   # `docker system prune` его не видит: файл принадлежит живому контейнеру.
@@ -22,7 +28,9 @@ services:
       - -c
       - archive_mode=on
       - -c
-      - archive_command=pg-archive-push %p
+      # «# pgbackrest» — комментарий для sh: backup и check без слова
+      # pgbackrest в archive_command падают с ошибкой [068].
+      - "archive_command=pg-archive-push %p  # pgbackrest"
       - -c
       - archive_timeout=300s
     volumes:
@@ -69,6 +77,8 @@ services:
     restart: always
     init: true
     command: ["uploads-backup-scheduler"]
+    volumes:
+      - uploads_backup_state:/state
     environment:
       RCLONE_CONFIG_SRC_TYPE: s3
       RCLONE_CONFIG_SRC_PROVIDER: Other
@@ -94,6 +104,8 @@ services:
       migrate:
         condition: service_completed_successfully
     entrypoint: ["python", "-m", "scripts.uploads.sweep_scheduler"]
+    volumes:
+      - uploads_backup_state:/backup-state:ro
     networks:
       - app_network
     env_file:
@@ -171,5 +183,7 @@ volumes:
     driver_opts:
       type: tmpfs
       device: tmpfs
+  # Отметка последней копии загрузок: пишет uploads_backup, читает uploads_sweep.
+  uploads_backup_state:
   caddy_data:
   caddy_config:

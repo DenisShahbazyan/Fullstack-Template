@@ -45,12 +45,17 @@ fi
 
 # archive_mode=off обязателен: иначе восстановленная копия начнёт писать
 # свои WAL в тот же репозиторий, что и рабочая база.
+# Лог копии cleanup удалит: причину сбоя печатаем сразу.
 pg_ctl -D "$RESTORE_DIR" -l "$RESTORE_DIR.log" -w -t 3600 start \
-    -o "-c archive_mode=off -c listen_addresses='' -c unix_socket_directories=$SOCKET_DIR"
+    -o "-c archive_mode=off -c listen_addresses='' -c unix_socket_directories=$SOCKET_DIR" \
+    || { tail -n 30 "$RESTORE_DIR.log" >&2; exit 1; }
 
 # pg_ctl возвращается, как только база пускает на чтение, а WAL ещё
 # докатывается. Проверять копию можно только после promote.
+# Копия упала (нехватка памяти, цель позже конца архива) — psql вернёт пустое,
+# и без проверки процесса цикл ждал бы вечно, вешая и планировщик.
 until [ "$(psql -h "$SOCKET_DIR" -U "$POSTGRES_USER" -d postgres -XAtc 'SELECT pg_is_in_recovery()')" = f ]; do
+    pg_ctl -D "$RESTORE_DIR" status >/dev/null || { tail -n 30 "$RESTORE_DIR.log" >&2; exit 1; }
     sleep 1
 done
 
