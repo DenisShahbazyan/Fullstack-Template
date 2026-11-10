@@ -27,22 +27,24 @@ FROM pg_stat_archiver
 SQL
 }
 
-# 0. Бэкапы. Пустой бакет — WAL молча отбрасываются. Выключить проверку —
-# только явно, BACKUPS_ALLOW_EMPTY=1. Heartbeat'ы не обязательны: без них
-# бэкапы идут так же, только о сбое никто не узнает.
-if [ "$(env_value BACKUPS_ALLOW_EMPTY)" = 1 ]; then
-    echo "BACKUPS_ALLOW_EMPTY=1: деплой без проверки бэкапов." >&2
+# 0. Бэкапы. Пустой бакет — бэкап выключен намеренно (проект ещё без настоящих
+# данных): деплой идёт, но говорит об этом в конце, где это видно. Heartbeat'ы
+# не обязательны: без них бэкапы идут так же, только о сбое никто не узнает.
+backup_notes=
+note() { backup_notes="$backup_notes
+ВНИМАНИЕ: $1"; }
+
+[ -n "$(env_value UPLOADS_BACKUP_BUCKET)" ] ||
+    note "UPLOADS_BACKUP_BUCKET пуст — копии загрузок НЕТ."
+if [ -n "$(env_value UPLOADS_BACKUP_BUCKET)" ] && [ -z "$(env_value UPLOADS_BACKUP_PING_URL)" ]; then
+    note "UPLOADS_BACKUP_PING_URL пуст — о сбое копии загрузок не сообщат."
+fi
+
+if [ -z "$(env_value PGBACKREST_REPO1_S3_BUCKET)" ]; then
+    note "PGBACKREST_REPO1_S3_BUCKET пуст — бэкапов базы НЕТ."
 else
-    for key in PGBACKREST_REPO1_S3_BUCKET UPLOADS_BACKUP_BUCKET; do
-        if [ -z "$(env_value "$key")" ]; then
-            echo "$key в .env.docker пуст: бэкапы не работают, деплой отменён." >&2
-            exit 1
-        fi
-    done
-    for key in BACKUP_PING_URL UPLOADS_BACKUP_PING_URL; do
-        [ -n "$(env_value "$key")" ] ||
-            echo "$key в .env.docker пуст: бэкапы идут, но о сбое не сообщат." >&2
-    done
+    [ -n "$(env_value BACKUP_PING_URL)" ] ||
+        note "BACKUP_PING_URL пуст — о сбое бэкапа базы не сообщат."
     # Архивация сломана — восстановить «на минуту до деплоя» нельзя, а
     # миграция может быть необратимой. backup поднимаем вместе с db: в новом
     # хранилище (сменили бакет или провайдера) stanza создаёт он, и до этого
@@ -102,3 +104,6 @@ fi
 # тега. За десяток деплоев это гигабайты. Без -a: чистим только dangling,
 # образы с тегами (postgres, caddy и т.п.) нужны.
 docker image prune -f
+
+# Последними строками: в середине лога деплоя это никто не прочтёт.
+[ -z "$backup_notes" ] || echo "$backup_notes" >&2
