@@ -8,6 +8,12 @@ on:
   push:
     branches: [main, master]
 
+# Два пуша подряд не должны запускать deploy.sh одновременно: второй гасил бы
+# контейнеры, которые первый уже удалил. Второй ждёт первого.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
 jobs:
   config:
     name: Read project config

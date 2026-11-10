@@ -30,10 +30,13 @@ check_archiving() {
     fi
 }
 
+# Пустой вывод — бэкапов ещё нет. Сбой самого info (S3 не ответил) — код 1:
+# принять его за «бэкапов нет» значило бы снять лишний бэкап с полной проверкой.
 last_backup_day() {
-    stop=$(pgbackrest --stanza="$STANZA" --output=json info \
+    info=$(pgbackrest --stanza="$STANZA" --output=json info) || return 1
+    stop=$(echo "$info" \
         | jq -r '[.[0].backup[]? | select(.type == "full")] | last | .timestamp.stop // empty')
-    [ -n "$stop" ] && date -u -d "@$stop" +%F
+    [ -z "$stop" ] || date -u -d "@$stop" +%F
 }
 
 # verify падает, только если нет WAL, нужного самому бэкапу. Пропавший
@@ -54,14 +57,20 @@ verify_repository() {
     return 1
 }
 
+# Проверка не прошла — повторяем её со следующим бэкапом, пока не пройдёт:
+# иначе завтрашний успешный бэкап погасил бы алерт при негодном восстановлении.
+check_pending=
+
 run_backup() {
     pg-backup || { notify /fail; return 1; }
-    if [ -z "$1" ] || [ "$(date -u +%u)" = 7 ]; then
+    if [ -z "$1" ] || [ "$(date -u +%u)" = 7 ] || [ -n "$check_pending" ]; then
+        check_pending=1
         pg-restore-check || { notify /fail; return 1; }
         # Проверка восстановления берёт только свежий бэкап, verify — все
         # бэкапы и WAL репозитория: пропавший сегмент молча оборвал бы
         # восстановление на момент внутри недели.
         verify_repository || { notify /fail; return 1; }
+        check_pending=
     fi
     notify ""
 }
@@ -78,15 +87,18 @@ until pgbackrest --stanza="$STANZA" stanza-create; do
     sleep "$RETRY_SECONDS"
 done
 
-next_archive_check=0
+# Первая проверка — не сразу: после смены хранилища Postgres ещё минуту
+# помнит неудачную отправку WAL в репозиторий, где не было stanza.
+next_archive_check=$(( $(date +%s) + 300 ))
 while :; do
     if [ "$(date +%s)" -ge "$next_archive_check" ]; then
         check_archiving
         next_archive_check=$(( $(date +%s) + ARCHIVE_CHECK_SECONDS ))
     fi
-    last=$(last_backup_day)
-    if [ "$last" != "$(date -u +%F)" ] && ! run_backup "$last"; then
-        sleep "$RETRY_SECONDS"
+    if last=$(last_backup_day); then
+        if [ "$last" != "$(date -u +%F)" ] && ! run_backup "$last"; then
+            sleep "$RETRY_SECONDS"
+        fi
     fi
     sleep 60
 done

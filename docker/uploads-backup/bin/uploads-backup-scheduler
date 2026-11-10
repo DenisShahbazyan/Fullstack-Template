@@ -71,7 +71,7 @@ purge_expired_archive() {
 }
 
 mark_success() {
-    date -u +%F | rclone rcat "$STATE"
+    echo "$1" | rclone rcat "$STATE"
 }
 
 run_backup() {
@@ -80,7 +80,10 @@ run_backup() {
         notify /fail
         return 1
     fi
-    if mirror_uploads && verify_mirror && purge_expired_archive && mark_success; then
+    # День — до копирования: копия, начатая в 23:58 и законченная после
+    # полуночи, иначе отметила бы новые сутки, и их копия не состоялась бы.
+    day=$(date -u +%F)
+    if mirror_uploads && verify_mirror && purge_expired_archive && mark_success "$day"; then
         notify ""
     else
         notify /fail

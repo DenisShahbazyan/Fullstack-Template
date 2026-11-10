@@ -18,38 +18,52 @@ WAIT_SECONDS=180
 
 compose pull
 
-# 0. Бэкапы. Пустой бакет — WAL молча отбрасываются, пустой heartbeat — сбой
-# никто не увидит. Выключить проверку — только явно, BACKUPS_ALLOW_EMPTY=1.
+# Архивация сломана, если последняя неудача позже последнего успеха.
+# Тот же запрос, что в pg-backup-scheduler.
+wal_failing() {
+    compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d postgres -XAt' <<'SQL'
+SELECT coalesce(last_failed_time > coalesce(last_archived_time, 'epoch'), false)
+FROM pg_stat_archiver
+SQL
+}
+
+# 0. Бэкапы. Пустой бакет — WAL молча отбрасываются. Выключить проверку —
+# только явно, BACKUPS_ALLOW_EMPTY=1. Heartbeat'ы не обязательны: без них
+# бэкапы идут так же, только о сбое никто не узнает.
 if [ "$(env_value BACKUPS_ALLOW_EMPTY)" = 1 ]; then
     echo "BACKUPS_ALLOW_EMPTY=1: деплой без проверки бэкапов." >&2
 else
-    for key in PGBACKREST_REPO1_S3_BUCKET BACKUP_PING_URL \
-        UPLOADS_BACKUP_BUCKET UPLOADS_BACKUP_PING_URL; do
+    for key in PGBACKREST_REPO1_S3_BUCKET UPLOADS_BACKUP_BUCKET; do
         if [ -z "$(env_value "$key")" ]; then
             echo "$key в .env.docker пуст: бэкапы не работают, деплой отменён." >&2
             exit 1
         fi
     done
+    for key in BACKUP_PING_URL UPLOADS_BACKUP_PING_URL; do
+        [ -n "$(env_value "$key")" ] ||
+            echo "$key в .env.docker пуст: бэкапы идут, но о сбое не сообщат." >&2
+    done
     # Архивация сломана — восстановить «на минуту до деплоя» нельзя, а
-    # миграция может быть необратимой. Тот же запрос, что в pg-backup-scheduler.
-    compose up -d db
+    # миграция может быть необратимой. backup поднимаем вместе с db: в новом
+    # хранилище (сменили бакет или провайдера) stanza создаёт он, и до этого
+    # WAL слать некуда. Postgres повторяет отправку раз в минуту — ждём.
+    compose up -d db backup
     tries=0
     until compose exec -T db pg_isready -q; do
         tries=$((tries + 1))
         [ "$tries" -lt 60 ] || { echo "Postgres не поднялся." >&2; exit 1; }
         sleep 2
     done
-    failing=$(compose exec -T db sh -c \
-        'psql -U "$POSTGRES_USER" -d postgres -XAt' <<'SQL'
-SELECT coalesce(last_failed_time > coalesce(last_archived_time, 'epoch'), false)
-FROM pg_stat_archiver
-SQL
-)
-    if [ "$failing" != f ]; then
-        echo "WAL не уходят в репозиторий (pg_stat_archiver), деплой отменён:" \
-            "см. docker logs postgres." >&2
-        exit 1
-    fi
+    tries=0
+    until [ "$(wal_failing)" = f ]; do
+        tries=$((tries + 1))
+        if [ "$tries" -ge 36 ]; then
+            echo "WAL не уходят в репозиторий (pg_stat_archiver), деплой отменён:" \
+                "см. docker logs postgres и postgres_backup." >&2
+            exit 1
+        fi
+        sleep 5
+    done
 fi
 
 # 1. Всё, кроме web и caddy. up сам ждёт migrate (uploads_sweep и воркеры
