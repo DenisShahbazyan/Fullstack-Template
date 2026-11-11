@@ -25,6 +25,10 @@ class ForeignUploadError(ValidationError):
     message = 'Файл не найден среди ваших загрузок. Загрузите его заново'
 
 
+class DuplicateUploadError(ValidationError):
+    message = 'Один и тот же файл выбран дважды'
+
+
 class StoredFileMissingError(ValidationError):
     message = 'Файл не найден в хранилище. Загрузите его заново'
 

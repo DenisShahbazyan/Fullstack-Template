@@ -15,7 +15,11 @@ from collections.abc import Collection, Sequence
 from app.core.config import settings
 from app.core.s3.client import s3_client
 from app.core.s3.store import store_upload
-from app.domain.uploads.errors import ForeignUploadError, UnsupportedFileTypeError
+from app.domain.uploads.errors import (
+    DuplicateUploadError,
+    ForeignUploadError,
+    UnsupportedFileTypeError,
+)
 from app.domain.uploads.images import WEBP_EXTENSION
 from app.domain.uploads.urls import (
     extension_of,
@@ -56,11 +60,16 @@ async def claim_uploads(
 
     Raises:
         ForeignUploadError: ключ не временной загрузки этого пользователя.
+        DuplicateUploadError: один ключ передан дважды.
         UnsupportedFileTypeError: файл не того вида, что ждёт поле.
         StoredFileMissingError: загрузку уже удалила чистка сирот.
         FileStorageUnavailableError: хранилище не скопировало файл.
     """
-    fresh = [key for key in dict.fromkeys(keys) if key not in kept]
+    # Два ключа на один файл дали бы две записи с одним файлом: удаление
+    # одной стёрло бы картинку у другой.
+    if len(set(keys)) != len(keys):
+        raise DuplicateUploadError()
+    fresh = [key for key in keys if key not in kept]
     if any(tmp_owner(key, settings.s3.TMP_PATH) != user_id for key in fresh):
         raise ForeignUploadError()
     if extensions is not None and any(
